@@ -328,13 +328,6 @@ The ideal denoiser is a **theoretical upper bound** on denoising performance. It
 
 In practice, neural networks trained as denoisers approximate this ideal denoiser.
 
-### Why CIFAR-10?
-
-The paper states:
-> "Note that Eq. 57 is feasible to compute in practice for small datasets—we show the results for CIFAR-10 in Figure 1b."
-
-CIFAR-10 is small enough (50,000 training images of 32×32 pixels) to compute the ideal denoiser for all test images and all sigma values in reasonable time.
-
 ## 📚 Related Files
 
 - **`README_FIGURE1.md`**: Detailed documentation for Figure 1 generation
@@ -363,17 +356,11 @@ If you use this code, please cite the original EDM paper:
 
 ## 📄 License
 
-This project is provided for research and educational purposes. The original EDM paper and code are licensed under CC BY-NC-SA 4.0.
+This implementation is free and open for anyone to use without restrictions. However, please note that any components related to the EDM paper (including pretrained models, paper-specific implementations, and derivatives) remain under the original EDM license (CC BY-NC-SA 4.0) and must be respected accordingly.
 
 ## 🐛 Issues & Contributions
 
 If you find any issues or have suggestions for improvements, please feel free to open an issue or submit a pull request.
-
-## 📞 Contact
-
-For questions about this implementation, please refer to:
-- Original EDM repository: https://github.com/NVlabs/edm
-- Paper: https://arxiv.org/abs/2206.00364
 
 ---
 
