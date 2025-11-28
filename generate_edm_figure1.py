@@ -16,165 +16,23 @@ Reference:
 """
 
 import torch
-import torchvision
-import torchvision.transforms as transforms
 from torchvision.utils import make_grid, save_image
-import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 import os
 
-
-def load_cifar10_dataset(root="./data", normalize=True):
-    """
-    Load CIFAR-10 training and test datasets.
-    
-    Parameters:
-    -----------
-    root : str
-        Root directory where CIFAR-10 data will be downloaded/stored
-    normalize : bool
-        Whether to apply normalization to [-1, 1] range
-        
-    Returns:
-    --------
-    train_images : torch.Tensor
-        Training images of shape (50000, 3, 32, 32)
-    test_images : torch.Tensor
-        Test images of shape (10000, 3, 32, 32)
-    """
-    if normalize:
-        transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-        ])
-    else:
-        transform = transforms.ToTensor()
-    
-    # Load training set
-    print("Loading CIFAR-10 training set...")
-    trainset = torchvision.datasets.CIFAR10(
-        root=root, 
-        train=True, 
-        download=True, 
-        transform=transform
-    )
-    
-    # Load test set
-    print("Loading CIFAR-10 test set...")
-    testset = torchvision.datasets.CIFAR10(
-        root=root, 
-        train=False, 
-        download=True, 
-        transform=transform
-    )
-    
-    # Convert to tensors
-    print("Converting datasets to tensors...")
-    train_images = torch.stack([trainset[i][0] for i in tqdm(range(len(trainset)), desc="Train")])
-    test_images = torch.stack([testset[i][0] for i in tqdm(range(len(testset)), desc="Test")])
-    
-    print(f"Training images shape: {train_images.shape}")
-    print(f"Test images shape: {test_images.shape}")
-    
-    return train_images, test_images
+# Import from modular structure
+from denoisers.ideal_denoiser import ideal_denoiser
+from utils.noise_utils import add_gaussian_noise
+from utils.image_utils import load_cifar10_dataset, normalize_for_display
+from utils.visualization import create_labeled_figure
 
 
-def ideal_denoiser(x_noisy, sigma, x_all):
-    """
-    Ideal denoiser using closed-form solution from EDM paper (Eq. 57).
-    
-    This computes D(x; sigma) = E[x' | x], where x' ~ p_data and x = x' + n with n ~ N(0, sigma^2 I).
-    
-    The formula computes:
-    D(x; sigma) = sum_i [x_i * exp(-||x - x_i||^2 / (2*sigma^2))] / sum_i [exp(-||x - x_i||^2 / (2*sigma^2))]
-    
-    Parameters:
-    -----------
-    x_noisy : torch.Tensor
-        Noisy input images of shape (batch_size, C, H, W)
-    sigma : float or torch.Tensor
-        Noise level (standard deviation)
-    x_all : torch.Tensor
-        All training images used as reference distribution of shape (num_samples, C, H, W)
-        
-    Returns:
-    --------
-    denoised : torch.Tensor
-        Denoised images of shape (batch_size, C, H, W)
-    """
-    # Compute squared L2 distance between noisy images and all training images
-    # x_all: (N, C, H, W), x_noisy: (B, C, H, W)
-    # Result: (N, B)
-    norm2 = ((x_all[:, None, :, :, :] - x_noisy[None, :, :, :, :]) ** 2).sum(dim=(2, 3, 4))
-    
-    # Compute log probabilities: log p(x | x_i) = -||x - x_i||^2 / (2*sigma^2)
-    sigma_norm2 = -norm2 / (2 * sigma ** 2)
-    
-    # Numerical stability: subtract max value before exp (log-sum-exp trick)
-    delta = torch.max(sigma_norm2, dim=0, keepdim=True)[0]
-    
-    # Compute exp of log probabilities
-    exp_norm2 = (sigma_norm2 - delta).exp()
-    
-    # Compute weighted sum: numerator and denominator
-    # exp_norm2: (N, B) -> (N, B, 1, 1, 1)
-    # x_all: (N, C, H, W) -> (N, 1, C, H, W)
-    numerator = exp_norm2[:, :, None, None, None] * x_all[:, None, :, :, :]  # (N, B, C, H, W)
-    denominator = exp_norm2.sum(dim=0)  # (B,)
-    
-    # Compute denoised images
-    denoised = numerator.sum(dim=0) / denominator[:, None, None, None]  # (B, C, H, W)
-    
-    return denoised
-
-
-def add_gaussian_noise(images, sigma):
-    """
-    Add Gaussian noise to images.
-    
-    Parameters:
-    -----------
-    images : torch.Tensor
-        Clean images of shape (batch_size, C, H, W)
-    sigma : float
-        Standard deviation of Gaussian noise
-        
-    Returns:
-    --------
-    noisy_images : torch.Tensor
-        Noisy images of shape (batch_size, C, H, W)
-    """
-    if sigma == 0:
-        return images.clone()
-    
-    noise = torch.randn_like(images) * sigma
-    return images + noise
-
-
-def normalize_for_display(images):
-    """
-    Min-max normalize images to [0, 1] range for display.
-    Each image in the batch is normalized independently.
-    
-    Parameters:
-    -----------
-    images : torch.Tensor
-        Images of shape (batch_size, C, H, W)
-        
-    Returns:
-    --------
-    normalized : torch.Tensor
-        Normalized images in [0, 1] range
-    """
-    batch_size = images.shape[0]
-    images_flat = images.view(batch_size, -1)
-    
-    min_vals = images_flat.min(dim=1, keepdim=True)[0].view(batch_size, 1, 1, 1)
-    max_vals = images_flat.max(dim=1, keepdim=True)[0].view(batch_size, 1, 1, 1)
-    
-    normalized = (images - min_vals) / (max_vals - min_vals + 1e-8)
-    return normalized
+# Note: Functions now imported from modular structure
+# - ideal_denoiser from denoisers.ideal_denoiser
+# - add_gaussian_noise from utils.noise_utils
+# - normalize_for_display from utils.image_utils
+# - load_cifar10_dataset from utils.image_utils
 
 
 def generate_figure1(train_images, test_images, 
@@ -269,52 +127,6 @@ def generate_figure1(train_images, test_images,
     create_labeled_figure(noisy_grid, denoised_grid, sigma_values, save_dir)
     
     return noisy_grid, denoised_grid
-
-
-def create_labeled_figure(noisy_grid, denoised_grid, sigma_values, save_dir):
-    """
-    Create a combined figure with labels for sigma values.
-    
-    Parameters:
-    -----------
-    noisy_grid : torch.Tensor
-        Grid of noisy images
-    denoised_grid : torch.Tensor
-        Grid of denoised images
-    sigma_values : list
-        List of sigma values used
-    save_dir : str
-        Directory to save the figure
-    """
-    fig, axes = plt.subplots(2, 1, figsize=(20, 8))
-    
-    # Convert grids to numpy
-    noisy_np = noisy_grid.permute(1, 2, 0).cpu().numpy()
-    denoised_np = denoised_grid.permute(1, 2, 0).cpu().numpy()
-    
-    # Plot noisy images
-    axes[0].imshow(noisy_np)
-    axes[0].set_title("Noisy Images (x + σ·ε, where ε ~ N(0, I))", fontsize=14, pad=10)
-    axes[0].axis('off')
-    
-    # Plot denoised images
-    axes[1].imshow(denoised_np)
-    axes[1].set_title("Ideal Denoiser Output D(x; σ) - Eq. 57", fontsize=14, pad=10)
-    axes[1].axis('off')
-    
-    # Add sigma labels at the top
-    num_sigmas = len(sigma_values)
-    for idx, sigma in enumerate(sigma_values):
-        x_pos = (idx + 0.5) / num_sigmas
-        fig.text(x_pos, 0.98, f'σ={sigma}', ha='center', va='top', fontsize=10, weight='bold')
-    
-    plt.tight_layout(rect=[0, 0, 1, 0.97])
-    
-    combined_path = os.path.join(save_dir, "figure1_combined.png")
-    plt.savefig(combined_path, dpi=150, bbox_inches='tight')
-    plt.close()
-    
-    print(f"Saved combined figure to: {combined_path}")
 
 
 def main():

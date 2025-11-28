@@ -1,9 +1,9 @@
-# EDM Ideal Denoiser Implementation
+# Image Denoising Methods - Modular Framework
 
 [![Paper](https://img.shields.io/badge/Paper-arXiv-red)](https://arxiv.org/abs/2206.00364)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-This repository contains a clean implementation of the **ideal denoiser** from the paper:
+This repository contains a **modular framework** for implementing and comparing various image denoising methods, with a focus on methods from the paper:
 
 > **Elucidating the Design Space of Diffusion-Based Generative Models**  
 > Tero Karras, Miika Aittala, Timo Aila, Samuli Laine  
@@ -11,50 +11,76 @@ This repository contains a clean implementation of the **ideal denoiser** from t
 
 ## 📖 Overview
 
-The ideal denoiser is a theoretical denoiser that uses the entire training dataset to denoise images. It computes the exact expected value of clean images given noisy observations, using a closed-form solution (Equation 57 from the paper):
+This framework provides:
+
+1. **Ideal Denoiser**: Theoretical optimal denoiser using closed-form solution (Equation 57)
+2. **EDM Denoiser**: Pretrained neural network-based denoiser from the EDM paper
+3. **Modular Architecture**: Easy to extend with new denoising methods
+4. **Common Utilities**: Shared tools for noise generation, data loading, and visualization
+
+### Ideal Denoiser Formula
 
 ```
 D(x; σ) = Σᵢ [xᵢ · exp(-||x - xᵢ||² / (2σ²))] / Σᵢ [exp(-||x - xᵢ||² / (2σ²))]
 ```
 
-This implementation reproduces **Figure 1** from the EDM paper, demonstrating the ideal denoiser's performance on CIFAR-10.
-
 ## 🎯 Features
 
-- ✅ Clean, well-documented implementation of Equation 57
-- ✅ Reproduces Figure 1 from the paper
-- ✅ Comprehensive unit tests
-- ✅ Multiple usage examples
-- ✅ Efficient computation with PyTorch
-- ✅ Support for both CPU and GPU
-- ✅ Batch processing support
+- ✅ **Modular Design**: Easy to add new denoising methods
+- ✅ **Clean Code**: Well-documented with comprehensive examples
+- ✅ **Multiple Methods**: Ideal denoiser + EDM neural network denoiser
+- ✅ **Reproduces EDM Figure 1**: Generate paper figures with one command
+- ✅ **Efficient**: Optimized PyTorch implementation
+- ✅ **Flexible**: CPU and GPU support, batch processing
+- ✅ **Extensible**: Template for adding new methods
 
 ## 📁 Project Structure
 
 ```
-ideal-and-edm-denoiser/
-├── generate_edm_figure1.py      # Main script to generate Figure 1
-├── test_ideal_denoiser.py       # Unit tests for ideal_denoiser function
-├── test_figure1_quick.py        # Quick test with reduced dataset
-├── example_usage.py             # Various usage examples
-├── requirements.txt             # Python dependencies
-├── README.md                    # This file
-└── README_FIGURE1.md            # Detailed documentation for Figure 1
+image-denoising-methods/
+├── denoisers/                   # Denoising method implementations
+│   ├── __init__.py
+│   ├── ideal_denoiser.py       # Ideal denoiser (Equation 57)
+│   └── edm_denoiser.py         # EDM neural network denoiser
+│
+├── utils/                       # Common utilities
+│   ├── __init__.py
+│   ├── noise_utils.py          # Noise generation
+│   ├── image_utils.py          # Data loading and processing
+│   └── visualization.py        # Plotting and visualization
+│
+├── draft_codes/                 # Experimental code
+├── data/                        # Dataset storage (auto-downloaded)
+├── results/                     # Output directory
+│
+├── generate_edm_figure1.py     # Reproduce EDM Figure 1
+├── example_usage.py            # Comprehensive usage examples
+├── requirements.txt            # Dependencies
+├── README.md                   # This file
+├── PROJECT_STRUCTURE.md        # Detailed architecture documentation
+├── README_FIGURE1.md           # Figure 1 documentation
+├── MATHEMATICAL_BACKGROUND.md  # Mathematical details
+└── QUICKSTART.md               # Quick start guide
 ```
+
+See [`PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md) for detailed architecture documentation.
 
 ## 🚀 Quick Start
 
 ### Installation
 
 ```bash
-# Clone or navigate to the repository
-cd ideal-and-edm-denoiser
+# Navigate to the repository
+cd image-denoising-methods
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Optional: For EDM pretrained models
+pip install git+https://github.com/NVlabs/edm.git
 ```
 
-### Generate Figure 1
+### Generate Figure 1 from EDM Paper
 
 ```bash
 # Generate Figure 1 with default settings
@@ -69,27 +95,44 @@ This will:
 
 **Expected runtime:** ~5-10 minutes on CPU, ~2-3 minutes on GPU
 
-### Quick Test
-
-For a faster test with reduced dataset:
+### Run Usage Examples
 
 ```bash
-# Quick test with only 1000 training images
-python test_figure1_quick.py
+# Run all examples demonstrating different features
+python example_usage.py
 ```
 
-**Expected runtime:** ~1-2 minutes
+This demonstrates:
+- Ideal denoiser usage
+- EDM pretrained model usage
+- Gradient ascent denoising
+- Batch processing
+- Custom noise utilities
 
-### Unit Tests
+### Use as a Library
 
-Verify the implementation:
+```python
+# Import denoising methods
+from denoisers.ideal_denoiser import ideal_denoiser
+from denoisers.edm_denoiser import load_pretrained_edm, edm_denoise
 
-```bash
-# Run unit tests
-python test_ideal_denoiser.py
+# Import utilities
+from utils.noise_utils import add_gaussian_noise
+from utils.image_utils import load_cifar10_dataset
+
+# Load data
+train_imgs, test_imgs = load_cifar10_dataset(root="./data")
+
+# Add noise
+noisy = add_gaussian_noise(test_imgs[0:1], sigma=2.0)
+
+# Denoise with ideal denoiser
+denoised_ideal = ideal_denoiser(noisy, sigma=2.0, x_all=train_imgs)
+
+# Denoise with EDM model (requires dnnlib)
+model, _ = load_pretrained_edm('cifar10-uncond')
+denoised_edm = edm_denoise(model, noisy, sigma=2.0)
 ```
-
-All tests should pass ✓
 
 ## 📊 Results
 
@@ -111,55 +154,119 @@ Each image demonstrates how the ideal denoiser performs across varying noise lev
 
 ## 💡 Usage Examples
 
-See `example_usage.py` for various usage patterns:
+### Example 1: Basic Ideal Denoiser
 
 ```python
-from generate_edm_figure1 import ideal_denoiser, add_gaussian_noise
+from denoisers.ideal_denoiser import ideal_denoiser
+from utils.noise_utils import add_gaussian_noise
+from utils.image_utils import load_cifar10_dataset
 
 # Load data
 train_images, test_images = load_cifar10_dataset(root="./data")
 
-# Select a test image
-test_img = test_images[0:1]  # Shape: (1, 3, 32, 32)
-
-# Add noise
+# Add noise and denoise
 sigma = 2.0
-noisy_img = add_gaussian_noise(test_img, sigma)
-
-# Denoise
+noisy_img = add_gaussian_noise(test_images[0:1], sigma)
 denoised_img = ideal_denoiser(noisy_img, sigma, train_images)
 ```
 
-Run examples:
+### Example 2: EDM Pretrained Model
 
-```bash
-python example_usage.py
+```python
+from denoisers.edm_denoiser import load_pretrained_edm, edm_denoise
+from utils.noise_utils import add_gaussian_noise
+
+# Load pretrained model
+model, config = load_pretrained_edm('cifar10-uncond')
+
+# Denoise
+noisy_img = add_gaussian_noise(test_images[0:1], sigma=3.0)
+denoised_img = edm_denoise(model, noisy_img, sigma=3.0)
 ```
+
+### Example 3: Gradient Ascent Denoising
+
+```python
+from denoisers.edm_denoiser import load_pretrained_edm, gradient_ascent_denoise
+
+model, _ = load_pretrained_edm('cifar10-uncond')
+denoised, trajectory = gradient_ascent_denoise(
+    model, noisy_img, sigma=3.0, num_steps=10, lr=1.0
+)
+```
+
+See [`example_usage.py`](example_usage.py) for more comprehensive examples.
 
 ## 🧪 Testing
 
-The repository includes comprehensive tests:
+Verify your installation:
 
-### 1. Unit Tests
 ```bash
-python test_ideal_denoiser.py
-```
+# Test imports
+python -c "from denoisers.ideal_denoiser import ideal_denoiser; print('✓ OK')"
+python -c "from denoisers.edm_denoiser import load_edm_model; print('✓ OK')"
+python -c "from utils.noise_utils import add_gaussian_noise; print('✓ OK')"
 
-Tests include:
-- ✅ Basic functionality
-- ✅ Zero noise case
-- ✅ High noise case
-- ✅ Batch processing
+# Run comprehensive examples
+python example_usage.py
 
-### 2. Quick Integration Test
-```bash
-python test_figure1_quick.py
-```
-
-### 3. Full Figure Generation
-```bash
+# Generate Figure 1 (full test)
 python generate_edm_figure1.py
 ```
+
+## 🔧 Adding New Denoising Methods
+
+The modular architecture makes it easy to add new methods:
+
+### Step 1: Create a new denoiser module
+
+```python
+# denoisers/my_denoiser.py
+"""
+My Custom Denoiser Implementation
+"""
+
+import torch
+
+def my_denoise(noisy_images, sigma, **kwargs):
+    """
+    Denoise images using my custom method.
+    
+    Parameters:
+    -----------
+    noisy_images : torch.Tensor
+        Noisy images of shape (batch_size, C, H, W)
+    sigma : float
+        Noise level
+        
+    Returns:
+    --------
+    denoised : torch.Tensor
+        Denoised images
+    """
+    # Your implementation here
+    denoised = your_algorithm(noisy_images, sigma)
+    return denoised
+```
+
+### Step 2: Register in `denoisers/__init__.py`
+
+```python
+from .my_denoiser import my_denoise
+__all__.append('my_denoise')
+```
+
+### Step 3: Use it!
+
+```python
+from denoisers.my_denoiser import my_denoise
+from utils.noise_utils import add_gaussian_noise
+
+noisy = add_gaussian_noise(images, sigma=2.0)
+denoised = my_denoise(noisy, sigma=2.0)
+```
+
+See [`PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md) for more details on extending the framework.
 
 ## 📝 Implementation Details
 
