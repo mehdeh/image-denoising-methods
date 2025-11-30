@@ -128,7 +128,7 @@ def main():
     """
     # Configuration
     data_root = "./data"
-    save_dir = "./results"
+    save_dir = "./results/edm_figure1"
     sigma_values = [0, 0.2, 0.5, 1, 2, 3, 5, 7, 10, 20, 50]
     
     # Optimization: Only load a small subset (e.g., 10 images) and select 3 from them

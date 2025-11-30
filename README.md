@@ -52,9 +52,11 @@ image-denoising-methods/
 ├── draft_codes/                 # Experimental code
 ├── data/                        # Dataset storage (auto-downloaded)
 ├── results/                     # Output directory
+│   ├── edm_figure1/            # EDM Figure 1 results
+│   └── denoiser_comparison/    # Comparison between ideal and EDM denoisers
 │
 ├── generate_edm_figure1.py     # Reproduce EDM Figure 1
-├── example_usage.py            # Comprehensive usage examples
+├── compare_denoisers.py        # Compare ideal vs EDM denoisers
 ├── requirements.txt            # Dependencies
 ├── README.md                   # This file
 ├── PROJECT_STRUCTURE.md        # Detailed architecture documentation
@@ -83,7 +85,7 @@ pip install git+https://github.com/NVlabs/edm.git
 ### Generate Figure 1 from EDM Paper
 
 ```bash
-# Generate Figure 1 with default settings
+# Generate Figure 1 with ideal denoiser only
 python generate_edm_figure1.py
 ```
 
@@ -91,23 +93,28 @@ This will:
 1. Download CIFAR-10 dataset (if needed)
 2. Generate noisy images with σ = [0, 0.2, 0.5, 1, 2, 3, 5, 7, 10, 20, 50]
 3. Denoise using the ideal denoiser
-4. Save results to `./results/` directory
+4. Save results to `./results/edm_figure1/` directory
 
 **Expected runtime:** ~5-10 minutes on CPU, ~2-3 minutes on GPU
 
-### Run Usage Examples
+### Compare Ideal and EDM Denoisers
 
 ```bash
-# Run all examples demonstrating different features
-python example_usage.py
+# Compare both denoising methods side-by-side
+python compare_denoisers.py
 ```
 
-This demonstrates:
-- Ideal denoiser usage
-- EDM pretrained model usage
-- Gradient ascent denoising
-- Batch processing
-- Custom noise utilities
+This will:
+1. Load pretrained EDM model (downloads ~300MB on first run)
+2. Generate noisy images at multiple noise levels
+3. Denoise using both ideal denoiser and EDM neural network
+4. Create comparison visualizations showing:
+   - Row 1: Noisy images
+   - Row 2: Ideal denoiser results (closed-form solution)
+   - Row 3: EDM denoiser results (pretrained neural network)
+5. Save results to `./results/denoiser_comparison/` directory
+
+**Expected runtime:** ~10-15 minutes on CPU, ~3-5 minutes on GPU
 
 ### Use as a Library
 
@@ -136,21 +143,34 @@ denoised_edm = edm_denoise(model, noisy, sigma=2.0)
 
 ## 📊 Results
 
-The script generates three output images:
+### EDM Figure 1 (`generate_edm_figure1.py`)
+
+Output directory: `./results/edm_figure1/`
 
 | File | Description |
 |------|-------------|
-| `figure1_noisy.png` | Grid of noisy images (2 rows × 11 columns) |
-| `figure1_denoised.png` | Grid of denoised images (2 rows × 11 columns) |
-| `figure1_combined.png` | Combined visualization with sigma labels |
+| `figure1_combined_train.png` | Combined visualization for training images |
+| `figure1_combined_test.png` | Combined visualization for test images |
 
-### Example Output
-
-The generated images show:
-- **Row 1-2:** Two different CIFAR-10 test images
+Each figure shows:
+- **Top row:** Noisy images with different σ values
+- **Bottom row:** Ideal denoiser results
 - **Columns:** Different noise levels (σ = 0 to 50)
 
-Each image demonstrates how the ideal denoiser performs across varying noise levels.
+### Denoiser Comparison (`compare_denoisers.py`)
+
+Output directory: `./results/denoiser_comparison/`
+
+| File | Description |
+|------|-------------|
+| `comparison_train.png` | Comparison for 3 training images |
+| `comparison_test.png` | Comparison for 3 test images |
+
+Each figure shows:
+- **Row 1:** Noisy images at different noise levels
+- **Row 2:** Ideal denoiser results (closed-form solution)
+- **Row 3:** EDM denoiser results (pretrained neural network)
+- **Columns:** Different noise levels (σ = 0 to 50)
 
 ## 💡 Usage Examples
 
@@ -191,11 +211,11 @@ from denoisers.edm_denoiser import load_pretrained_edm, gradient_ascent_denoise
 
 model, _ = load_pretrained_edm('cifar10-uncond')
 denoised, trajectory = gradient_ascent_denoise(
-    model, noisy_img, sigma=3.0, num_steps=10, lr=1.0
+    model, noisy_img, sigma=3.0, num_steps=10, lr=1.0, return_trajectory=True
 )
 ```
 
-See [`example_usage.py`](example_usage.py) for more comprehensive examples.
+See [`compare_denoisers.py`](compare_denoisers.py) for a comprehensive comparison example.
 
 ## 🧪 Testing
 
@@ -207,11 +227,11 @@ python -c "from denoisers.ideal_denoiser import ideal_denoiser; print('✓ OK')"
 python -c "from denoisers.edm_denoiser import load_edm_model; print('✓ OK')"
 python -c "from utils.noise_utils import add_gaussian_noise; print('✓ OK')"
 
-# Run comprehensive examples
-python example_usage.py
-
-# Generate Figure 1 (full test)
+# Generate Figure 1 (ideal denoiser only)
 python generate_edm_figure1.py
+
+# Full comparison test (ideal + EDM denoiser)
+python compare_denoisers.py
 ```
 
 ## 🔧 Adding New Denoising Methods
