@@ -5,8 +5,11 @@ import os
 project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 print("project_dir:", project_dir)
 
-# If needed to import from project modules so dnnlib:
-# sys.path.append(os.path.join(project_dir, "."))
+# Add EDM dependencies to path
+edm_path = os.path.join(project_dir, "denoisers", "edm")
+if edm_path not in sys.path:
+    sys.path.insert(0, edm_path)
+
 os.chdir(project_dir)
 
 import torch

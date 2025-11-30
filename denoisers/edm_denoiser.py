@@ -12,7 +12,13 @@ Reference:
 import torch
 import pickle
 import os
+import sys
 from typing import Optional, Tuple, List, Union
+
+# Add EDM dependencies to path
+_edm_path = os.path.join(os.path.dirname(__file__), 'edm')
+if _edm_path not in sys.path:
+    sys.path.insert(0, _edm_path)
 
 # Import model download utility
 try:
@@ -100,8 +106,7 @@ def load_edm_model(
     
     Notes:
     ------
-    Requires dnnlib from the EDM repository for URL downloads.
-    Install via: pip install git+https://github.com/NVlabs/edm.git
+    Can use dnnlib from denoisers/edm/ for URL downloads if model_utils is not available.
     """
     # Set default device
     if device is None:
@@ -135,7 +140,7 @@ def load_edm_model(
                 raise ImportError(
                     "Neither model_utils nor dnnlib is available. "
                     "Please ensure utils.model_utils is accessible or "
-                    "install dnnlib via: pip install git+https://github.com/NVlabs/edm.git"
+                    "dnnlib is available in denoisers/edm/"
                 )
     
     # Load the model from disk

@@ -41,16 +41,24 @@ image-denoising-methods/
 ├── denoisers/                   # Denoising method implementations
 │   ├── __init__.py
 │   ├── ideal_denoiser.py       # Ideal denoiser (Equation 57)
-│   └── edm_denoiser.py         # EDM neural network denoiser
+│   ├── edm_denoiser.py         # EDM neural network denoiser
+│   └── edm/                    # EDM dependencies (CC BY-NC-SA 4.0)
+│       ├── dnnlib/             # Deep learning utilities from NVlabs/edm
+│       ├── torch_utils/        # PyTorch utilities from NVlabs/edm
+│       ├── LICENSE.txt         # EDM license information
+│       ├── NOTICE.txt          # Attribution and citation
+│       └── __init__.py
 │
 ├── utils/                       # Common utilities
 │   ├── __init__.py
 │   ├── noise_utils.py          # Noise generation
 │   ├── image_utils.py          # Data loading and processing
+│   ├── model_utils.py          # Model download utilities
 │   └── visualization.py        # Plotting and visualization
 │
 ├── draft_codes/                 # Experimental code
 ├── data/                        # Dataset storage (auto-downloaded)
+├── pretrain_models/             # Pretrained EDM models (auto-downloaded)
 ├── results/                     # Output directory
 │   ├── edm_figure1/            # EDM Figure 1 results
 │   └── denoiser_comparison/    # Comparison between ideal and EDM denoisers
@@ -62,7 +70,7 @@ image-denoising-methods/
 ├── PROJECT_STRUCTURE.md        # Detailed architecture documentation
 ├── README_FIGURE1.md           # Figure 1 documentation
 ├── MATHEMATICAL_BACKGROUND.md  # Mathematical details
-└── QUICKSTART.md               # Quick start guide
+└── REFACTORING_NOTES.md        # Development notes
 ```
 
 See [`PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md) for detailed architecture documentation.
@@ -78,8 +86,8 @@ cd image-denoising-methods
 # Install dependencies
 pip install -r requirements.txt
 
-# Optional: For EDM pretrained models
-pip install git+https://github.com/NVlabs/edm.git
+# Note: EDM dependencies (dnnlib, torch_utils) are included in denoisers/edm/
+# No additional installation needed for pretrained models
 ```
 
 ### Generate Figure 1 from EDM Paper
@@ -136,7 +144,7 @@ noisy = add_gaussian_noise(test_imgs[0:1], sigma=2.0)
 # Denoise with ideal denoiser
 denoised_ideal = ideal_denoiser(noisy, sigma=2.0, x_all=train_imgs)
 
-# Denoise with EDM model (requires dnnlib)
+# Denoise with EDM model
 model, _ = load_pretrained_edm('cifar10-uncond')
 denoised_edm = edm_denoise(model, noisy, sigma=2.0)
 ```
@@ -376,7 +384,44 @@ If you use this code, please cite the original EDM paper:
 
 ## 📄 License
 
-This implementation is free and open for anyone to use without restrictions. However, please note that any components related to the EDM paper (including pretrained models, paper-specific implementations, and derivatives) remain under the original EDM license (CC BY-NC-SA 4.0) and must be respected accordingly.
+This project contains code from multiple sources with different licenses:
+
+### Main Project Code
+The core implementation (ideal denoiser, utilities, scripts) is provided without restrictions and can be freely used, modified, and distributed.
+
+### EDM Dependencies (denoisers/edm/)
+The `denoisers/edm/` directory contains code from the [NVlabs/edm](https://github.com/NVlabs/edm) repository:
+
+- **License**: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)
+- **Copyright**: © 2022, NVIDIA CORPORATION & AFFILIATES
+- **Components**: `dnnlib/` and `torch_utils/` modules
+- **Source**: https://github.com/NVlabs/edm
+- **Paper**: [Elucidating the Design Space of Diffusion-Based Generative Models](https://arxiv.org/abs/2206.00364)
+
+**License Summary:**
+- ✅ Free to use for non-commercial research and educational purposes
+- ✅ Must provide attribution to the original authors
+- ✅ Can modify and distribute under the same license
+- ❌ Cannot be used for commercial purposes without permission
+- ❌ No warranties provided
+
+**Attribution:**
+```bibtex
+@inproceedings{Karras2022edm,
+  author    = {Tero Karras and Miika Aittala and Timo Aila and Samuli Laine},
+  title     = {Elucidating the Design Space of Diffusion-Based Generative Models},
+  booktitle = {Proc. NeurIPS},
+  year      = {2022}
+}
+```
+
+For full license details, see:
+- `denoisers/edm/LICENSE.txt` - Full license text
+- `denoisers/edm/NOTICE.txt` - Attribution and citation information
+- http://creativecommons.org/licenses/by-nc-sa/4.0/
+
+### Pretrained Models
+EDM pretrained models are also licensed under CC BY-NC-SA 4.0 and are downloaded from the official NVlabs repository.
 
 ## 🐛 Issues & Contributions
 
