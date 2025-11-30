@@ -77,6 +77,76 @@ def load_cifar10_dataset(root="./data", normalize=True):
     return train_images, test_images
 
 
+def load_cifar10_subset(root="./data", normalize=True, train=True, max_samples=None, selected_indices=None):
+    """
+    Load a subset of CIFAR-10 dataset (much faster than loading entire dataset).
+    
+    Parameters:
+    -----------
+    root : str
+        Root directory where CIFAR-10 data will be downloaded/stored
+    normalize : bool
+        Whether to apply normalization to [-1, 1] range
+    train : bool
+        Whether to load training set (True) or test set (False)
+    max_samples : int, optional
+        Maximum number of samples to load. If None, loads all samples.
+        If specified, loads first max_samples images.
+    selected_indices : list of int, optional
+        Specific indices to load. If provided, max_samples is ignored.
+        
+    Returns:
+    --------
+    images : torch.Tensor
+        Selected images of shape (num_selected, 3, 32, 32)
+        
+    Examples:
+    ---------
+    >>> from utils.image_utils import load_cifar10_subset
+    >>> 
+    >>> # Load first 10 training images
+    >>> train_subset = load_cifar10_subset(root="./data", train=True, max_samples=10)
+    >>> 
+    >>> # Load specific indices from test set
+    >>> test_subset = load_cifar10_subset(root="./data", train=False, selected_indices=[20, 21, 22])
+    """
+    if normalize:
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+        ])
+    else:
+        transform = transforms.ToTensor()
+    
+    # Load dataset (this doesn't load all images into memory, just creates the dataset object)
+    dataset_name = "training" if train else "test"
+    print(f"Loading CIFAR-10 {dataset_name} set...")
+    dataset = torchvision.datasets.CIFAR10(
+        root=root, 
+        train=train, 
+        download=True, 
+        transform=transform
+    )
+    
+    # Determine which indices to load
+    if selected_indices is not None:
+        indices = selected_indices
+        print(f"Loading {len(indices)} specific images from {dataset_name} set (indices: {indices})...")
+    elif max_samples is not None:
+        indices = list(range(min(max_samples, len(dataset))))
+        print(f"Loading first {len(indices)} images from {dataset_name} set...")
+    else:
+        indices = list(range(len(dataset)))
+        print(f"Loading all {len(indices)} images from {dataset_name} set...")
+    
+    # Convert selected images to tensors
+    images = torch.stack([dataset[i][0] for i in tqdm(indices, desc=f"Loading {dataset_name}")])
+    
+    print(f"Loaded {dataset_name} images shape: {images.shape}")
+    
+    return images
+
+
 def normalize_for_display(images):
     """
     Min-max normalize images to [0, 1] range for display.
