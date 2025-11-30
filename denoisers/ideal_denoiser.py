@@ -23,6 +23,89 @@ def ideal_denoiser(x_noisy, sigma, x_all):
     This computes D(x; sigma) = E[x' | x], where x' ~ p_data and x = x' + n 
     with n ~ N(0, sigma^2 I).
     
+    The formula from the paper:
+    D(x; σ) = Σᵢ [N(x; xᵢ, σ²I) · xᵢ] / Σᵢ [N(x; xᵢ, σ²I)]
+    
+    Which expands to:
+    D(x; σ) = Σᵢ [xᵢ · exp(-||x - xᵢ||² / (2σ²))] / Σᵢ [exp(-||x - xᵢ||² / (2σ²))]
+    
+    This is a weighted average of all training images, where the weights are
+    proportional to the likelihood of each training image generating the observed
+    noisy image under Gaussian noise.
+    
+    Parameters:
+    -----------
+    x_noisy : torch.Tensor
+        Noisy input images of shape (batch_size, C, H, W)
+    sigma : float or torch.Tensor
+        Noise level (standard deviation)
+    x_all : torch.Tensor
+        All training images used as reference distribution of shape (num_samples, C, H, W)
+        
+    Returns:
+    --------
+    denoised : torch.Tensor
+        Denoised images of shape (batch_size, C, H, W)
+        
+    Notes:
+    ------
+    - Direct implementation of the paper formula without numerical stability improvements
+    - May have numerical issues for large distances or small sigma values
+    - Computational complexity: O(N × B × C × H × W)
+      where N is the number of training images and B is the batch size
+    - Memory complexity: O(N × C × H × W)
+    - Only feasible for small datasets like CIFAR-10
+    
+    Examples:
+    ---------
+    >>> import torch
+    >>> from denoisers.ideal_denoiser import ideal_denoiser
+    >>> from utils.noise_utils import add_gaussian_noise
+    >>> 
+    >>> # Create sample data
+    >>> train_images = torch.randn(1000, 3, 32, 32)  # 1000 training images
+    >>> test_image = torch.randn(1, 3, 32, 32)  # 1 test image
+    >>> 
+    >>> # Add noise and denoise
+    >>> sigma = 2.0
+    >>> noisy_image = add_gaussian_noise(test_image, sigma)
+    >>> denoised_image = ideal_denoiser(noisy_image, sigma, train_images)
+    >>> 
+    >>> print(f"Noisy shape: {noisy_image.shape}")
+    >>> print(f"Denoised shape: {denoised_image.shape}")
+    """
+    # Compute squared L2 distance between noisy images and all training images
+    # x_all: (N, C, H, W), x_noisy: (B, C, H, W)
+    # Result: (N, B)
+    norm2 = ((x_all[:, None, :, :, :] - x_noisy[None, :, :, :, :]) ** 2).sum(dim=(2, 3, 4))
+    
+    # Compute Gaussian likelihood: exp(-||x - x_i||^2 / (2*sigma^2))
+    # This corresponds to N(x; x_i, sigma^2 I)
+    exp_norm2 = torch.exp(-norm2 / (2 * sigma ** 2))
+    
+    # Compute weighted sum: numerator and denominator
+    # exp_norm2: (N, B) -> (N, B, 1, 1, 1)
+    # x_all: (N, C, H, W) -> (N, 1, C, H, W)
+    numerator = exp_norm2[:, :, None, None, None] * x_all[:, None, :, :, :]  # (N, B, C, H, W)
+    denominator = exp_norm2.sum(dim=0)  # (B,)
+    
+    # Compute denoised images
+    denoised = numerator.sum(dim=0) / denominator[:, None, None, None]  # (B, C, H, W)
+    
+    return denoised
+
+
+def ideal_denoiser_improved(x_noisy, sigma, x_all):
+    """
+    Improved ideal denoiser with numerical stability (Equation 57 from EDM Paper).
+    
+    This is an improved version of the ideal denoiser that uses log-sum-exp trick
+    for numerical stability. The formula is the same as ideal_denoiser, but with
+    additional numerical stability improvements.
+    
+    This computes D(x; sigma) = E[x' | x], where x' ~ p_data and x = x' + n 
+    with n ~ N(0, sigma^2 I).
+    
     The formula computes:
     D(x; σ) = Σᵢ [xᵢ · exp(-||x - xᵢ||² / (2σ²))] / Σᵢ [exp(-||x - xᵢ||² / (2σ²))]
     
@@ -46,7 +129,8 @@ def ideal_denoiser(x_noisy, sigma, x_all):
         
     Notes:
     ------
-    - Uses log-sum-exp trick for numerical stability
+    - Uses log-sum-exp trick for numerical stability (subtracts max value before exp)
+    - More numerically stable than ideal_denoiser, especially for large distances or small sigma
     - Computational complexity: O(N × B × C × H × W)
       where N is the number of training images and B is the batch size
     - Memory complexity: O(N × C × H × W)
@@ -55,7 +139,7 @@ def ideal_denoiser(x_noisy, sigma, x_all):
     Examples:
     ---------
     >>> import torch
-    >>> from denoisers.ideal_denoiser import ideal_denoiser
+    >>> from denoisers.ideal_denoiser import ideal_denoiser_improved
     >>> from utils.noise_utils import add_gaussian_noise
     >>> 
     >>> # Create sample data
@@ -65,7 +149,7 @@ def ideal_denoiser(x_noisy, sigma, x_all):
     >>> # Add noise and denoise
     >>> sigma = 2.0
     >>> noisy_image = add_gaussian_noise(test_image, sigma)
-    >>> denoised_image = ideal_denoiser(noisy_image, sigma, train_images)
+    >>> denoised_image = ideal_denoiser_improved(noisy_image, sigma, train_images)
     >>> 
     >>> print(f"Noisy shape: {noisy_image.shape}")
     >>> print(f"Denoised shape: {denoised_image.shape}")
