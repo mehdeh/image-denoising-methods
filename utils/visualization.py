@@ -70,16 +70,17 @@ def create_comparison_figure(
     noisy_grid: torch.Tensor,
     ideal_grid: torch.Tensor,
     edm_grid: torch.Tensor,
+    grad_ascent_grid: torch.Tensor,
     sigma_values: list,
     save_path: str,
     num_sigmas: int
 ) -> None:
     """
-    Create a 3-row comparison figure with labels for sigma values.
+    Create a 4-row comparison figure with labels for sigma values.
     
     This function creates a publication-quality figure showing noisy images,
-    ideal denoiser results, and EDM denoiser results in a grid format with
-    labeled sigma values aligned with image columns.
+    ideal denoiser results, EDM denoiser results, and gradient ascent denoiser
+    results in a grid format with labeled sigma values aligned with image columns.
     
     Parameters:
     -----------
@@ -89,6 +90,8 @@ def create_comparison_figure(
         Grid of ideal denoiser results (C, H, W) after make_grid
     edm_grid : torch.Tensor
         Grid of EDM denoiser results (C, H, W) after make_grid
+    grad_ascent_grid : torch.Tensor
+        Grid of gradient ascent denoiser results (C, H, W) after make_grid
     sigma_values : list
         List of sigma values used for noise levels
     save_path : str
@@ -106,15 +109,17 @@ def create_comparison_figure(
     >>> noisy = make_grid(torch.randn(9, 3, 32, 32), nrow=3)
     >>> ideal = make_grid(torch.randn(9, 3, 32, 32), nrow=3)
     >>> edm = make_grid(torch.randn(9, 3, 32, 32), nrow=3)
+    >>> grad_ascent = make_grid(torch.randn(9, 3, 32, 32), nrow=3)
     >>> 
-    >>> create_comparison_figure(noisy, ideal, edm, [0, 1, 2], "comparison.png", 3)
+    >>> create_comparison_figure(noisy, ideal, edm, grad_ascent, [0, 1, 2], "comparison.png", 3)
     """
-    fig, axes = plt.subplots(3, 1, figsize=(20, 12))
+    fig, axes = plt.subplots(4, 1, figsize=(20, 16))
     
     # Convert grids to numpy
     noisy_np = noisy_grid.permute(1, 2, 0).cpu().numpy()
     ideal_np = ideal_grid.permute(1, 2, 0).cpu().numpy()
     edm_np = edm_grid.permute(1, 2, 0).cpu().numpy()
+    grad_ascent_np = grad_ascent_grid.permute(1, 2, 0).cpu().numpy()
     
     # Plot noisy images
     axes[0].imshow(noisy_np, aspect='auto')
@@ -137,11 +142,20 @@ def create_comparison_figure(
     # Plot EDM denoiser results
     axes[2].imshow(edm_np, aspect='auto')
     axes[2].set_title(
-        "EDM Denoiser Output D(x; σ) - Pretrained Neural Network",
+        "EDM Denoiser Output D(x; σ) - Pretrained Neural Network (One-step)",
         fontsize=14,
         pad=10
     )
     axes[2].axis('off')
+    
+    # Plot gradient ascent denoiser results
+    axes[3].imshow(grad_ascent_np, aspect='auto')
+    axes[3].set_title(
+        "Gradient Ascent Denoiser - Iterative Optimization (x ← x + lr·∇log p(x; σ))",
+        fontsize=14,
+        pad=10
+    )
+    axes[3].axis('off')
     
     # Apply tight_layout first to get final axes positions
     plt.tight_layout(rect=[0, 0, 1, 0.97])

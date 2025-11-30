@@ -14,9 +14,10 @@ This repository contains a **modular framework** for implementing and comparing 
 This framework provides:
 
 1. **Ideal Denoiser**: Theoretical optimal denoiser using closed-form solution (Equation 57)
-2. **EDM Denoiser**: Pretrained neural network-based denoiser from the EDM paper
-3. **Modular Architecture**: Easy to extend with new denoising methods
-4. **Common Utilities**: Shared tools for noise generation, data loading, and visualization
+2. **EDM Denoiser**: Pretrained neural network-based denoiser from the EDM paper (one-step)
+3. **Gradient Ascent Denoiser**: Iterative denoising using score function optimization
+4. **Modular Architecture**: Easy to extend with new denoising methods
+5. **Common Utilities**: Shared tools for noise generation, data loading, and visualization
 
 ### Ideal Denoiser Formula
 
@@ -28,7 +29,7 @@ D(x; σ) = Σᵢ [xᵢ · exp(-||x - xᵢ||² / (2σ²))] / Σᵢ [exp(-||x - x�
 
 - ✅ **Modular Design**: Easy to add new denoising methods
 - ✅ **Clean Code**: Well-documented with comprehensive examples
-- ✅ **Multiple Methods**: Ideal denoiser + EDM neural network denoiser
+- ✅ **Multiple Methods**: Ideal denoiser + EDM neural network denoiser + Gradient ascent denoiser
 - ✅ **Reproduces EDM Figure 1**: Generate paper figures with one command
 - ✅ **Efficient**: Optimized PyTorch implementation
 - ✅ **Flexible**: CPU and GPU support, batch processing
@@ -64,7 +65,7 @@ image-denoising-methods/
 │   └── denoiser_comparison/    # Comparison between ideal and EDM denoisers
 │
 ├── generate_edm_figure1.py     # Reproduce EDM Figure 1
-├── compare_denoisers.py        # Compare ideal vs EDM denoisers
+├── compare_denoisers.py        # Compare ideal vs EDM vs gradient ascent denoisers
 ├── requirements.txt            # Dependencies
 ├── README.md                   # This file
 ├── PROJECT_STRUCTURE.md        # Detailed architecture documentation
@@ -105,24 +106,25 @@ This will:
 
 **Expected runtime:** ~5-10 minutes on CPU, ~2-3 minutes on GPU
 
-### Compare Ideal and EDM Denoisers
+### Compare All Denoising Methods
 
 ```bash
-# Compare both denoising methods side-by-side
+# Compare all three denoising methods side-by-side
 python compare_denoisers.py
 ```
 
 This will:
 1. Load pretrained EDM model (downloads ~300MB on first run)
 2. Generate noisy images at multiple noise levels
-3. Denoise using both ideal denoiser and EDM neural network
+3. Denoise using ideal denoiser, EDM neural network, and gradient ascent
 4. Create comparison visualizations showing:
    - Row 1: Noisy images
    - Row 2: Ideal denoiser results (closed-form solution)
-   - Row 3: EDM denoiser results (pretrained neural network)
+   - Row 3: EDM denoiser results (one-step neural network)
+   - Row 4: Gradient ascent denoiser (iterative optimization)
 5. Save results to `./results/denoiser_comparison/` directory
 
-**Expected runtime:** ~10-15 minutes on CPU, ~3-5 minutes on GPU
+**Expected runtime:** ~30-40 minutes on CPU, ~8-10 minutes on GPU
 
 ### Use as a Library
 
@@ -177,7 +179,8 @@ Output directory: `./results/denoiser_comparison/`
 Each figure shows:
 - **Row 1:** Noisy images at different noise levels
 - **Row 2:** Ideal denoiser results (closed-form solution)
-- **Row 3:** EDM denoiser results (pretrained neural network)
+- **Row 3:** EDM denoiser results (one-step neural network)
+- **Row 4:** Gradient ascent denoiser (iterative optimization, 10 steps)
 - **Columns:** Different noise levels (σ = 0 to 50)
 
 ## 💡 Usage Examples
