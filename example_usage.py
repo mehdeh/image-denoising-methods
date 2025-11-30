@@ -139,7 +139,7 @@ def example_3_gradient_ascent():
         # Denoise using gradient ascent
         print("Denoising with gradient ascent (10 steps)...")
         denoised_image, trajectory = gradient_ascent_denoise(
-            model, noisy_image, sigma, num_steps=10, lr=1.0
+            model, noisy_image, sigma, num_steps=10, lr=1.0, return_trajectory=True
         )
         
         # Save trajectory
