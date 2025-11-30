@@ -2,7 +2,7 @@
 Generate Figure 1 from EDM Paper (Elucidating the Design Space of Diffusion-Based Generative Models)
 
 This script reproduces the ideal denoiser visualization from the paper by:
-1. Loading three sample images from CIFAR-10 test set
+1. Loading three sample images from CIFAR-10 training set
 2. Adding Gaussian noise with various sigma values
 3. Denoising using the ideal denoiser (closed-form solution from Eq. 57)
 4. Visualizing both noisy and denoised images in grid format with titles and sigma labels
@@ -23,7 +23,7 @@ import os
 import matplotlib.pyplot as plt
 
 # Import from modular structure
-from denoisers.ideal_denoiser import ideal_denoiser
+from denoisers.ideal_denoiser import ideal_denoiser_improved
 from utils.noise_utils import add_gaussian_noise
 from utils.image_utils import load_cifar10_dataset, normalize_for_display
 from utils.visualization import create_labeled_figure
@@ -74,7 +74,7 @@ def save_labeled_grid(grid, sigma_values, title, save_path):
 
 def generate_figure1(train_images, test_images, 
                      sigma_values=[0, 0.2, 0.5, 1, 2, 3, 5, 7, 10, 20, 50],
-                     test_indices=[20, 21, 22],
+                     train_indices=[20, 21, 22],
                      save_dir="./results",
                      device='cpu'):
     """
@@ -83,13 +83,13 @@ def generate_figure1(train_images, test_images,
     Parameters:
     -----------
     train_images : torch.Tensor
-        CIFAR-10 training images (used for ideal denoiser)
+        CIFAR-10 training images (used for ideal denoiser and source of sample images)
     test_images : torch.Tensor
-        CIFAR-10 test images (source of test samples)
+        CIFAR-10 test images (not used, kept for compatibility)
     sigma_values : list
         List of noise levels to test
-    test_indices : list
-        Indices of test images to use
+    train_indices : list
+        Indices of training images to use
     save_dir : str
         Directory to save output images
     device : str
@@ -97,11 +97,11 @@ def generate_figure1(train_images, test_images,
     """
     os.makedirs(save_dir, exist_ok=True)
     
-    # Select test images
-    selected_images = test_images[test_indices].to(device)
+    # Select images from training set
     train_images = train_images.to(device)
+    selected_images = train_images[train_indices].to(device)
     
-    num_images = len(test_indices)
+    num_images = len(train_indices)
     num_sigmas = len(sigma_values)
     
     print(f"\nGenerating Figure 1 with {num_images} images and {num_sigmas} sigma values...")
@@ -129,7 +129,7 @@ def generate_figure1(train_images, test_images,
                 denoised_img = img_batch.clone()
             else:
                 with torch.no_grad():
-                    denoised_img = ideal_denoiser(noisy_img, sigma, train_images)
+                    denoised_img = ideal_denoiser_improved(noisy_img, sigma, train_images)
             
             noisy_row.append(noisy_img.squeeze(0))
             denoised_row.append(denoised_img.squeeze(0))
@@ -185,7 +185,7 @@ def main():
     data_root = "./data"
     save_dir = "./results"
     sigma_values = [0, 0.2, 0.5, 1, 2, 3, 5, 7, 10, 20, 50]
-    test_indices = [20, 21, 22]  # Indices of test images to visualize (3 images)
+    train_indices = [20, 21, 22]  # Indices of training images to visualize (3 images)
     
     # Device selection
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -207,7 +207,7 @@ def main():
         train_images=train_images,
         test_images=test_images,
         sigma_values=sigma_values,
-        test_indices=test_indices,
+        train_indices=train_indices,
         save_dir=save_dir,
         device=device
     )
