@@ -75,35 +75,33 @@ def generate_figure1(selected_images, train_images,
     noisy_images_all = []
     denoised_images_all = []
     
-    # Process each image
-    for img_idx, img in enumerate(selected_images):
-        print(f"\nProcessing image {img_idx + 1}/{num_images}...")
+    # Process each sigma value with batch of all images (more efficient)
+    for sigma_idx, sigma in enumerate(tqdm(sigma_values, desc="Processing sigma values")):
+        # Add noise to all images at once
+        noisy_batch = add_gaussian_noise(selected_images, sigma)  # (num_images, C, H, W)
         
-        noisy_row = []
-        denoised_row = []
+        # Denoise using ideal denoiser
+        if sigma == 0:
+            denoised_batch = selected_images.clone()
+        else:
+            with torch.no_grad():
+                denoised_batch = ideal_denoiser(noisy_batch, sigma, train_images)
         
-        # Process each sigma value
-        for sigma in tqdm(sigma_values, desc=f"Image {img_idx + 1}"):
-            # Add noise
-            img_batch = img.unsqueeze(0)  # (1, C, H, W)
-            noisy_img = add_gaussian_noise(img_batch, sigma)
-            
-            # Denoise using ideal denoiser
-            if sigma == 0:
-                denoised_img = img_batch.clone()
-            else:
-                with torch.no_grad():
-                    denoised_img = ideal_denoiser(noisy_img, sigma, train_images)
-            
-            noisy_row.append(noisy_img.squeeze(0))
-            denoised_row.append(denoised_img.squeeze(0))
-        
-        noisy_images_all.append(torch.stack(noisy_row))
-        denoised_images_all.append(torch.stack(denoised_row))
+        noisy_images_all.append(noisy_batch)
+        denoised_images_all.append(denoised_batch)
     
-    # Stack all images
-    noisy_images_grid = torch.cat(noisy_images_all, dim=0)  # (num_images * num_sigmas, C, H, W)
-    denoised_images_grid = torch.cat(denoised_images_all, dim=0)  # (num_images * num_sigmas, C, H, W)
+    # Stack all images: transpose from (num_sigmas, num_images, C, H, W) to (num_images, num_sigmas, C, H, W)
+    # then flatten to (num_images * num_sigmas, C, H, W)
+    noisy_stack = torch.stack(noisy_images_all, dim=0)  # (num_sigmas, num_images, C, H, W)
+    denoised_stack = torch.stack(denoised_images_all, dim=0)  # (num_sigmas, num_images, C, H, W)
+    
+    # Transpose to organize by image rows, sigma columns
+    noisy_stack = noisy_stack.transpose(0, 1)  # (num_images, num_sigmas, C, H, W)
+    denoised_stack = denoised_stack.transpose(0, 1)  # (num_images, num_sigmas, C, H, W)
+    
+    # Flatten to grid format
+    noisy_images_grid = noisy_stack.reshape(-1, *noisy_stack.shape[2:])  # (num_images * num_sigmas, C, H, W)
+    denoised_images_grid = denoised_stack.reshape(-1, *denoised_stack.shape[2:])  # (num_images * num_sigmas, C, H, W)
     
     # Normalize for display
     noisy_images_display = normalize_for_display(noisy_images_grid)
