@@ -2,10 +2,10 @@
 Generate Figure 1 from EDM Paper (Elucidating the Design Space of Diffusion-Based Generative Models)
 
 This script reproduces the ideal denoiser visualization from the paper by:
-1. Loading three sample images from CIFAR-10 training set
+1. Loading three sample images from both CIFAR-10 training and test sets
 2. Adding Gaussian noise with various sigma values
 3. Denoising using the ideal denoiser (closed-form solution from Eq. 57)
-4. Visualizing both noisy and denoised images in grid format with titles and sigma labels
+4. Visualizing both noisy and denoised images in combined grid format with titles and sigma labels
 
 The ideal denoiser is computed using the entire CIFAR-10 training set as the reference distribution.
 
@@ -23,7 +23,7 @@ import os
 import matplotlib.pyplot as plt
 
 # Import from modular structure
-from denoisers.ideal_denoiser import ideal_denoiser_improved
+from denoisers.ideal_denoiser import ideal_denoiser
 from utils.noise_utils import add_gaussian_noise
 from utils.image_utils import load_cifar10_dataset, normalize_for_display
 from utils.visualization import create_labeled_figure
@@ -36,45 +36,9 @@ from utils.visualization import create_labeled_figure
 # - load_cifar10_dataset from utils.image_utils
 
 
-def save_labeled_grid(grid, sigma_values, title, save_path):
-    """
-    Save a grid image with title and sigma labels.
-    
-    Parameters:
-    -----------
-    grid : torch.Tensor
-        Image grid (C, H, W) after make_grid
-    sigma_values : list
-        List of sigma values used for noise levels
-    title : str
-        Title to display at the top
-    save_path : str
-        Path to save the labeled image
-    """
-    fig, ax = plt.subplots(1, 1, figsize=(20, 6))
-    
-    # Convert grid to numpy
-    grid_np = grid.permute(1, 2, 0).cpu().numpy()
-    
-    # Plot grid
-    ax.imshow(grid_np)
-    ax.set_title(title, fontsize=14, pad=10)
-    ax.axis('off')
-    
-    # Add sigma labels at the top
-    num_sigmas = len(sigma_values)
-    for idx, sigma in enumerate(sigma_values):
-        x_pos = (idx + 0.5) / num_sigmas
-        fig.text(x_pos, 0.98, f'σ={sigma}', ha='center', va='top', fontsize=10, weight='bold')
-    
-    plt.tight_layout(rect=[0, 0, 1, 0.97])
-    plt.savefig(save_path, dpi=150, bbox_inches='tight')
-    plt.close()
-
-
-def generate_figure1(train_images, test_images, 
+def generate_figure1(selected_images, train_images, 
                      sigma_values=[0, 0.2, 0.5, 1, 2, 3, 5, 7, 10, 20, 50],
-                     train_indices=[20, 21, 22],
+                     dataset_name="train",
                      save_dir="./results",
                      device='cpu'):
     """
@@ -82,14 +46,14 @@ def generate_figure1(train_images, test_images,
     
     Parameters:
     -----------
+    selected_images : torch.Tensor
+        Selected images to process (from train or test set)
     train_images : torch.Tensor
-        CIFAR-10 training images (used for ideal denoiser and source of sample images)
-    test_images : torch.Tensor
-        CIFAR-10 test images (not used, kept for compatibility)
+        CIFAR-10 training images (used for ideal denoiser)
     sigma_values : list
         List of noise levels to test
-    train_indices : list
-        Indices of training images to use
+    dataset_name : str
+        Name of the dataset ('train' or 'test') for naming output file
     save_dir : str
         Directory to save output images
     device : str
@@ -97,11 +61,11 @@ def generate_figure1(train_images, test_images,
     """
     os.makedirs(save_dir, exist_ok=True)
     
-    # Select images from training set
+    # Move to device
     train_images = train_images.to(device)
-    selected_images = train_images[train_indices].to(device)
+    selected_images = selected_images.to(device)
     
-    num_images = len(train_indices)
+    num_images = len(selected_images)
     num_sigmas = len(sigma_values)
     
     print(f"\nGenerating Figure 1 with {num_images} images and {num_sigmas} sigma values...")
@@ -129,7 +93,7 @@ def generate_figure1(train_images, test_images,
                 denoised_img = img_batch.clone()
             else:
                 with torch.no_grad():
-                    denoised_img = ideal_denoiser_improved(noisy_img, sigma, train_images)
+                    denoised_img = ideal_denoiser(noisy_img, sigma, train_images)
             
             noisy_row.append(noisy_img.squeeze(0))
             denoised_row.append(denoised_img.squeeze(0))
@@ -150,29 +114,9 @@ def generate_figure1(train_images, test_images,
     noisy_grid = make_grid(noisy_images_display, nrow=num_sigmas, padding=2, pad_value=1.0)
     denoised_grid = make_grid(denoised_images_display, nrow=num_sigmas, padding=2, pad_value=1.0)
     
-    # Save grids with labels
-    noisy_path = os.path.join(save_dir, "figure1_noisy.png")
-    denoised_path = os.path.join(save_dir, "figure1_denoised.png")
-    
-    # Save with labels (title and sigma values)
-    save_labeled_grid(
-        noisy_grid, 
-        sigma_values, 
-        "Noisy Images (x + σ·ε, where ε ~ N(0, I))", 
-        noisy_path
-    )
-    save_labeled_grid(
-        denoised_grid, 
-        sigma_values, 
-        "Ideal Denoiser Output D(x; σ) - Eq. 57", 
-        denoised_path
-    )
-    
-    print(f"\nSaved noisy images grid to: {noisy_path}")
-    print(f"Saved denoised images grid to: {denoised_path}")
-    
     # Create combined visualization with labels
-    create_labeled_figure(noisy_grid, denoised_grid, sigma_values, save_dir)
+    combined_path = os.path.join(save_dir, f"figure1_combined_{dataset_name}.png")
+    create_labeled_figure(noisy_grid, denoised_grid, sigma_values, combined_path, num_sigmas)
     
     return noisy_grid, denoised_grid
 
@@ -180,12 +124,14 @@ def generate_figure1(train_images, test_images,
 def main():
     """
     Main function to generate Figure 1 from EDM paper.
+    Generates combined figures for both training and test datasets.
     """
     # Configuration
     data_root = "./data"
     save_dir = "./results"
     sigma_values = [0, 0.2, 0.5, 1, 2, 3, 5, 7, 10, 20, 50]
     train_indices = [20, 21, 22]  # Indices of training images to visualize (3 images)
+    test_indices = [20, 21, 22]   # Indices of test images to visualize (3 images)
     
     # Device selection
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -198,16 +144,32 @@ def main():
     # Load CIFAR-10 dataset
     train_images, test_images = load_cifar10_dataset(root=data_root, normalize=True)
     
-    # Generate Figure 1
+    # Generate Figure 1 for training set
     print("\n" + "="*80)
-    print("Generating EDM Figure 1: Ideal Denoiser Visualization")
+    print("Generating EDM Figure 1: Training Set")
     print("="*80)
     
-    noisy_grid, denoised_grid = generate_figure1(
+    train_selected = train_images[train_indices]
+    generate_figure1(
+        selected_images=train_selected,
         train_images=train_images,
-        test_images=test_images,
         sigma_values=sigma_values,
-        train_indices=train_indices,
+        dataset_name="train",
+        save_dir=save_dir,
+        device=device
+    )
+    
+    # Generate Figure 1 for test set
+    print("\n" + "="*80)
+    print("Generating EDM Figure 1: Test Set")
+    print("="*80)
+    
+    test_selected = test_images[test_indices]
+    generate_figure1(
+        selected_images=test_selected,
+        train_images=train_images,
+        sigma_values=sigma_values,
+        dataset_name="test",
         save_dir=save_dir,
         device=device
     )
@@ -216,9 +178,8 @@ def main():
     print("Figure generation completed successfully!")
     print("="*80)
     print(f"\nOutput files saved in: {save_dir}/")
-    print("- figure1_noisy.png: Grid of noisy images")
-    print("- figure1_denoised.png: Grid of denoised images") 
-    print("- figure1_combined.png: Combined visualization with labels")
+    print("- figure1_combined_train.png: Combined visualization for training set")
+    print("- figure1_combined_test.png: Combined visualization for test set")
 
 
 if __name__ == "__main__":
