@@ -14,6 +14,13 @@ import pickle
 import os
 from typing import Optional, Tuple, List, Union
 
+# Import model download utility
+try:
+    from utils.model_utils import ensure_model_downloaded
+    HAS_MODEL_UTILS = True
+except ImportError:
+    HAS_MODEL_UTILS = False
+
 
 def _convert_to_tensor(
     sigma: Union[float, torch.Tensor],
@@ -102,28 +109,40 @@ def load_edm_model(
     elif isinstance(device, str):
         device = torch.device(device)
     
-    # Check if the model file already exists
+    # Check if the model file already exists, download if needed
+    if not os.path.exists(model_path) and url is not None:
+        # Try using the model_utils download first
+        if HAS_MODEL_UTILS:
+            print(f"Model not found at {model_path}. Downloading...")
+            if not ensure_model_downloaded(model_path, url):
+                raise RuntimeError(f"Failed to download model from {url}")
+        else:
+            # Fallback to dnnlib if available
+            print(f"Model not found at {model_path}. Downloading from {url}...")
+            try:
+                import dnnlib
+                with dnnlib.util.open_url(url) as f:
+                    net = pickle.load(f)['ema'].to(device)
+                
+                # Save the downloaded model
+                os.makedirs(os.path.dirname(model_path), exist_ok=True)
+                with open(model_path, "wb") as f:
+                    pickle.dump({'ema': net}, f)
+                print(f"Model downloaded and saved at {model_path}")
+                net.eval()
+                return net
+            except ImportError:
+                raise ImportError(
+                    "Neither model_utils nor dnnlib is available. "
+                    "Please ensure utils.model_utils is accessible or "
+                    "install dnnlib via: pip install git+https://github.com/NVlabs/edm.git"
+                )
+    
+    # Load the model from disk
     if os.path.exists(model_path):
-        print(f"Loading EDM model from local path: {model_path}")
+        print(f"Loading EDM model from: {model_path}")
         with open(model_path, "rb") as f:
             net = pickle.load(f)['ema'].to(device)
-    elif url is not None:
-        print(f"Model not found at {model_path}. Downloading from {url}...")
-        try:
-            import dnnlib
-            with dnnlib.util.open_url(url) as f:
-                net = pickle.load(f)['ema'].to(device)
-            
-            # Save the downloaded model
-            os.makedirs(os.path.dirname(model_path), exist_ok=True)
-            with open(model_path, "wb") as f:
-                pickle.dump({'ema': net}, f)
-            print(f"Model downloaded and saved at {model_path}")
-        except ImportError:
-            raise ImportError(
-                "dnnlib is required to download models from URLs. "
-                "Install it via: pip install git+https://github.com/NVlabs/edm.git"
-            )
     else:
         raise FileNotFoundError(
             f"Model not found at {model_path} and no URL provided for download."

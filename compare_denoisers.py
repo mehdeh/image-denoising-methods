@@ -23,102 +23,71 @@ from torchvision.utils import make_grid
 import numpy as np
 from tqdm import tqdm
 import os
-import matplotlib.pyplot as plt
 
 # Import from modular structure
 from denoisers.ideal_denoiser import ideal_denoiser
 from denoisers.edm_denoiser import load_pretrained_edm, edm_denoise
 from utils.noise_utils import add_gaussian_noise
 from utils.image_utils import load_cifar10_subset, normalize_for_display
+from utils.visualization import create_comparison_figure
 
 
-def create_comparison_figure(
-    noisy_grid: torch.Tensor,
-    ideal_grid: torch.Tensor,
-    edm_grid: torch.Tensor,
-    sigma_values: list,
-    save_path: str,
-    num_sigmas: int
-) -> None:
+def process_images_at_sigma(
+    selected_images: torch.Tensor,
+    train_images: torch.Tensor,
+    edm_model: torch.nn.Module,
+    sigma: float,
+    device: str
+) -> tuple:
     """
-    Create a 3-row comparison figure with labels for sigma values.
-    
-    This function creates a publication-quality figure showing noisy images,
-    ideal denoiser results, and EDM denoiser results in a grid format with
-    labeled sigma values aligned with image columns.
+    Process images at a specific noise level with both denoisers.
     
     Parameters:
     -----------
-    noisy_grid : torch.Tensor
-        Grid of noisy images (C, H, W) after make_grid
-    ideal_grid : torch.Tensor
-        Grid of ideal denoiser results (C, H, W) after make_grid
-    edm_grid : torch.Tensor
-        Grid of EDM denoiser results (C, H, W) after make_grid
-    sigma_values : list
-        List of sigma values used for noise levels
-    save_path : str
-        Full path to save the figure
-    num_sigmas : int
-        Number of sigma values (columns in the grid)
+    selected_images : torch.Tensor
+        Clean images to process
+    train_images : torch.Tensor
+        Training images for ideal denoiser reference
+    edm_model : torch.nn.Module
+        Pretrained EDM model
+    sigma : float
+        Noise level
+    device : str
+        Device to run computations on
+        
+    Returns:
+    --------
+    tuple : (noisy, ideal_denoised, edm_denoised)
+        Three tensors containing the noisy images and both denoised versions
     """
-    fig, axes = plt.subplots(3, 1, figsize=(20, 12))
-    
-    # Convert grids to numpy
-    noisy_np = noisy_grid.permute(1, 2, 0).cpu().numpy()
-    ideal_np = ideal_grid.permute(1, 2, 0).cpu().numpy()
-    edm_np = edm_grid.permute(1, 2, 0).cpu().numpy()
-    
-    # Plot noisy images
-    axes[0].imshow(noisy_np, aspect='auto')
-    axes[0].set_title(
-        "Noisy Images (x + σ·ε, where ε ~ N(0, I))",
-        fontsize=14,
-        pad=10
-    )
-    axes[0].axis('off')
-    
-    # Plot ideal denoiser results
-    axes[1].imshow(ideal_np, aspect='auto')
-    axes[1].set_title(
-        "Ideal Denoiser Output D(x; σ) - Eq. 57 (Closed-form)",
-        fontsize=14,
-        pad=10
-    )
-    axes[1].axis('off')
-    
-    # Plot EDM denoiser results
-    axes[2].imshow(edm_np, aspect='auto')
-    axes[2].set_title(
-        "EDM Denoiser Output D(x; σ) - Pretrained Neural Network",
-        fontsize=14,
-        pad=10
-    )
-    axes[2].axis('off')
-    
-    # Apply tight_layout first to get final axes positions
-    plt.tight_layout(rect=[0, 0, 1, 0.97])
-    
-    # Add sigma labels at the top, aligned with actual image columns
-    bbox = axes[0].get_position()
-    for idx, sigma in enumerate(sigma_values):
-        # Calculate position of each column center in figure coordinates
-        x_pos_fig = bbox.x0 + (idx + 0.5) / num_sigmas * bbox.width
-        fig.text(
-            x_pos_fig,
-            0.98,
-            f'σ={sigma}',
-            ha='center',
-            va='top',
-            fontsize=10,
-            weight='bold'
+    # Handle sigma = 0 case
+    if sigma == 0:
+        return (
+            selected_images.clone(),
+            selected_images.clone(),
+            selected_images.clone()
         )
     
-    # Save figure
-    plt.savefig(save_path, dpi=150, bbox_inches='tight', pad_inches=0.1)
-    plt.close()
+    # Add noise
+    noisy_batch = add_gaussian_noise(selected_images, sigma)
     
-    print(f"Saved comparison figure to: {save_path}")
+    # Denoise with ideal denoiser
+    with torch.no_grad():
+        ideal_denoised_batch = ideal_denoiser(
+            noisy_batch,
+            sigma,
+            train_images
+        )
+    
+    # Denoise with EDM denoiser
+    with torch.no_grad():
+        edm_denoised_batch = edm_denoise(
+            edm_model,
+            noisy_batch,
+            sigma
+        )
+    
+    return noisy_batch, ideal_denoised_batch, edm_denoised_batch
 
 
 def generate_denoiser_comparison(
@@ -182,35 +151,20 @@ def generate_denoiser_comparison(
     
     # Process each sigma value with batch of all images
     for sigma in tqdm(sigma_values, desc="Processing sigma values"):
-        # Add noise to all images at once
-        noisy_batch = add_gaussian_noise(selected_images, sigma)
+        noisy, ideal_denoised, edm_denoised = process_images_at_sigma(
+            selected_images,
+            train_images,
+            edm_model,
+            sigma,
+            device
+        )
         
-        # Denoise using ideal denoiser
-        if sigma == 0:
-            ideal_denoised_batch = selected_images.clone()
-            edm_denoised_batch = selected_images.clone()
-        else:
-            # Ideal denoiser
-            with torch.no_grad():
-                ideal_denoised_batch = ideal_denoiser(
-                    noisy_batch,
-                    sigma,
-                    train_images
-                )
-            
-            # EDM denoiser
-            with torch.no_grad():
-                edm_denoised_batch = edm_denoise(
-                    edm_model,
-                    noisy_batch,
-                    sigma
-                )
-        
-        noisy_images_all.append(noisy_batch)
-        ideal_denoised_all.append(ideal_denoised_batch)
-        edm_denoised_all.append(edm_denoised_batch)
+        noisy_images_all.append(noisy)
+        ideal_denoised_all.append(ideal_denoised)
+        edm_denoised_all.append(edm_denoised)
     
-    # Stack all images and transpose to organize by image rows, sigma columns
+    # Stack and organize images: transpose from (num_sigmas, num_images, C, H, W)
+    # to (num_images, num_sigmas, C, H, W) then flatten to grid format
     noisy_stack = torch.stack(noisy_images_all, dim=0).transpose(0, 1)
     ideal_stack = torch.stack(ideal_denoised_all, dim=0).transpose(0, 1)
     edm_stack = torch.stack(edm_denoised_all, dim=0).transpose(0, 1)
@@ -245,6 +199,93 @@ def generate_denoiser_comparison(
     return noisy_grid_img, ideal_grid_img, edm_grid_img
 
 
+def load_edm_model(device: str):
+    """
+    Load pretrained EDM model with error handling.
+    
+    Parameters:
+    -----------
+    device : str
+        Device to load model on
+        
+    Returns:
+    --------
+    tuple : (model, config) or (None, None) if loading fails
+    """
+    print("\n" + "="*80)
+    print("Loading pretrained EDM model...")
+    print("="*80)
+    
+    try:
+        model, config = load_pretrained_edm('cifar10-uncond', device=device)
+        print(f"✓ EDM model loaded successfully")
+        print(f"  Architecture: {config['architecture']}")
+        print(f"  Resolution: {config['resolution']}x{config['resolution']}")
+        print(f"  Conditional: {config['conditional']}")
+        return model, config
+    except ModuleNotFoundError as e:
+        print(f"✗ Failed to load EDM model: {e}")
+        print("\nThe EDM pretrained models require the EDM codebase to be installed.")
+        print("\nPlease install EDM dependencies:")
+        print("  pip install git+https://github.com/NVlabs/edm.git")
+        print("\nNote: The model file will be downloaded automatically (~226MB)")
+        print("      if not already present in ./pretrain_models/")
+        return None, None
+    except Exception as e:
+        print(f"✗ Failed to load EDM model: {e}")
+        print("\nPlease ensure you have the required dependencies.")
+        return None, None
+
+
+def setup_data_subsets(data_root: str, config: dict) -> tuple:
+    """
+    Load data subsets for comparison.
+    
+    Parameters:
+    -----------
+    data_root : str
+        Root directory for CIFAR-10 data
+    config : dict
+        Configuration dictionary with selection parameters
+        
+    Returns:
+    --------
+    tuple : (train_selected, test_selected, train_images_for_denoiser)
+    """
+    print("\n" + "="*80)
+    print("Loading image subsets...")
+    print("="*80)
+    
+    # Load small subsets for selection
+    train_subset = load_cifar10_subset(
+        root=data_root,
+        normalize=True,
+        train=True,
+        max_samples=config['max_samples_for_selection']
+    )
+    test_subset = load_cifar10_subset(
+        root=data_root,
+        normalize=True,
+        train=False,
+        max_samples=config['max_samples_for_selection']
+    )
+    
+    # Select specific images
+    train_selected = train_subset[config['train_selection_indices']]
+    test_selected = test_subset[config['test_selection_indices']]
+    
+    # Load training images for ideal denoiser reference
+    print(f"\nLoading {config['ideal_denoiser_subset_size']} training images for ideal denoiser...")
+    train_images_for_denoiser = load_cifar10_subset(
+        root=data_root,
+        normalize=True,
+        train=True,
+        max_samples=config['ideal_denoiser_subset_size']
+    )
+    
+    return train_selected, test_selected, train_images_for_denoiser
+
+
 def main():
     """
     Main function to compare ideal and EDM denoisers.
@@ -254,17 +295,15 @@ def main():
     side-by-side for visual quality assessment.
     """
     # Configuration
-    data_root = "./data"
-    save_dir = "./results/denoiser_comparison"
-    sigma_values = [0, 0.2, 0.5, 1, 2, 3, 5, 7, 10, 20, 50]
-    
-    # Image selection parameters
-    max_samples_for_selection = 10
-    train_selection_indices = [2, 3, 4]
-    test_selection_indices = [2, 3, 4]
-    
-    # Ideal denoiser parameters
-    ideal_denoiser_subset_size = 1000
+    config = {
+        'data_root': "./data",
+        'save_dir': "./results/denoiser_comparison",
+        'sigma_values': [0, 0.2, 0.5, 1, 2, 3, 5, 7, 10, 20, 50],
+        'max_samples_for_selection': 10,
+        'train_selection_indices': [2, 3, 4],
+        'test_selection_indices': [2, 3, 4],
+        'ideal_denoiser_subset_size': 1000,
+    }
     
     # Device selection
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -275,51 +314,14 @@ def main():
     np.random.seed(42)
     
     # Load EDM model
-    print("\n" + "="*80)
-    print("Loading pretrained EDM model...")
-    print("="*80)
-    
-    try:
-        edm_model, edm_config = load_pretrained_edm('cifar10-uncond', device=device)
-        print(f"✓ EDM model loaded successfully")
-        print(f"  Architecture: {edm_config['architecture']}")
-        print(f"  Resolution: {edm_config['resolution']}x{edm_config['resolution']}")
-        print(f"  Conditional: {edm_config['conditional']}")
-    except Exception as e:
-        print(f"✗ Failed to load EDM model: {e}")
-        print("\nPlease ensure you have the required dependencies:")
-        print("  pip install git+https://github.com/NVlabs/edm.git")
+    edm_model, edm_config = load_edm_model(device)
+    if edm_model is None:
         return
     
-    # Load image subsets
-    print("\n" + "="*80)
-    print("Loading image subsets...")
-    print("="*80)
-    
-    train_subset = load_cifar10_subset(
-        root=data_root,
-        normalize=True,
-        train=True,
-        max_samples=max_samples_for_selection
-    )
-    test_subset = load_cifar10_subset(
-        root=data_root,
-        normalize=True,
-        train=False,
-        max_samples=max_samples_for_selection
-    )
-    
-    # Select specific images
-    train_selected = train_subset[train_selection_indices]
-    test_selected = test_subset[test_selection_indices]
-    
-    # Load training images for ideal denoiser reference
-    print(f"\nLoading {ideal_denoiser_subset_size} training images for ideal denoiser...")
-    train_images_for_denoiser = load_cifar10_subset(
-        root=data_root,
-        normalize=True,
-        train=True,
-        max_samples=ideal_denoiser_subset_size
+    # Load data subsets
+    train_selected, test_selected, train_images_for_denoiser = setup_data_subsets(
+        config['data_root'],
+        config
     )
     
     # Generate comparison for training set
@@ -331,9 +333,9 @@ def main():
         selected_images=train_selected,
         train_images=train_images_for_denoiser,
         edm_model=edm_model,
-        sigma_values=sigma_values,
+        sigma_values=config['sigma_values'],
         dataset_name="train",
-        save_dir=save_dir,
+        save_dir=config['save_dir'],
         device=device
     )
     
@@ -346,16 +348,16 @@ def main():
         selected_images=test_selected,
         train_images=train_images_for_denoiser,
         edm_model=edm_model,
-        sigma_values=sigma_values,
+        sigma_values=config['sigma_values'],
         dataset_name="test",
-        save_dir=save_dir,
+        save_dir=config['save_dir'],
         device=device
     )
     
     print("\n" + "="*80)
     print("Comparison generation completed successfully!")
     print("="*80)
-    print(f"\nOutput files saved in: {save_dir}/")
+    print(f"\nOutput files saved in: {config['save_dir']}/")
     print("- comparison_train.png: Comparison for training set")
     print("- comparison_test.png: Comparison for test set")
     print("\nEach figure shows:")
@@ -366,4 +368,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
