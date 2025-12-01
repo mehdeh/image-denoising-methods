@@ -6,24 +6,24 @@ This document explains the mathematical theory behind the ideal denoiser impleme
 
 ### Noise Model
 
-Given a clean image \( x' \sim p_{\text{data}} \), we observe a noisy version:
+Given a clean image $ x' \sim p_{\text{data}} $, we observe a noisy version:
 
-\[
+$$
 x = x' + n, \quad n \sim \mathcal{N}(0, \sigma^2 I)
-\]
+$$
 
 where:
-- \( x' \): clean image from the data distribution
-- \( x \): noisy observation
-- \( n \): Gaussian noise with standard deviation \( \sigma \)
+- $ x' $: clean image from the data distribution
+- $ x $: noisy observation
+- $ n $: Gaussian noise with standard deviation $ \sigma $
 
 ### Denoising Goal
 
 The ideal denoiser aims to recover the clean image by computing:
 
-\[
-D(x; \sigma) = \mathbb{E}[x' \mid x] = \int x' \cdot p(x' \mid x) \, dx'
-\]
+$$
+D(x; \sigma) = \mathbb{E}$$x' \mid x$$ = \int x' \cdot p(x' \mid x) \, dx'
+$$
 
 This is the **posterior mean** - the expected value of the clean image given the noisy observation.
 
@@ -41,55 +41,55 @@ This approach directly computes the posterior mean using Bayes' rule.
 
 Using Bayes' rule:
 
-\[
+$$
 p(x' \mid x) = \frac{p(x \mid x') \cdot p(x')}{p(x)}
-\]
+$$
 
 #### Step 2: Likelihood
 
-The likelihood of observing \( x \) given \( x' \) follows from the Gaussian noise model:
+The likelihood of observing $ x $ given $ x' $ follows from the Gaussian noise model:
 
-\[
+$$
 p(x \mid x') = \mathcal{N}(x; x', \sigma^2 I) = \frac{1}{Z} \exp\left(-\frac{\|x - x'\|^2}{2\sigma^2}\right)
-\]
+$$
 
-where \( Z \) is the normalization constant.
+where $ Z $ is the normalization constant.
 
 #### Step 3: Empirical Distribution
 
-For a finite dataset \( \{x_1, x_2, \ldots, x_N\} \), we approximate:
+For a finite dataset $ \{x_1, x_2, \ldots, x_N\} $, we approximate:
 
-\[
+$$
 p_{\text{data}}(x') \approx \frac{1}{N} \sum_{i=1}^{N} \delta(x' - x_i)
-\]
+$$
 
 #### Step 4: Posterior Mean Calculation
 
 Combining the above:
 
-\[
+$$
 D(x; \sigma) = \int x' \cdot p(x' \mid x) \, dx'
-\]
+$$
 
-\[
+$$
 = \frac{\int x' \cdot p(x \mid x') \cdot p(x') \, dx'}{\int p(x \mid x') \cdot p(x') \, dx'}
-\]
+$$
 
 Substituting the empirical distribution:
 
-\[
+$$
 = \frac{\int x' \cdot \mathcal{N}(x; x', \sigma^2 I) \cdot \frac{1}{N} \sum_{i=1}^{N} \delta(x' - x_i) \, dx'}{\int \mathcal{N}(x; x', \sigma^2 I) \cdot \frac{1}{N} \sum_{i=1}^{N} \delta(x' - x_i) \, dx'}
-\]
+$$
 
-\[
+$$
 = \frac{\sum_{i=1}^{N} x_i \cdot \mathcal{N}(x; x_i, \sigma^2 I)}{\sum_{i=1}^{N} \mathcal{N}(x; x_i, \sigma^2 I)}
-\]
+$$
 
 Expanding the Gaussian density (up to a constant):
 
-\[
+$$
 \boxed{D(x; \sigma) = \frac{\sum_{i=1}^{N} x_i \cdot \exp\left(-\frac{\|x - x_i\|^2}{2\sigma^2}\right)}{\sum_{i=1}^{N} \exp\left(-\frac{\|x - x_i\|^2}{2\sigma^2}\right)}}
-\]
+$$
 
 This is **Equation 57** from the EDM paper.
 
@@ -101,107 +101,107 @@ This approach derives the same formula by minimizing the denoising score matchin
 
 #### Step 1: Noisy Data Distribution
 
-For a finite training set \( \{x_1, \dots, x_N\} \), the empirical data distribution is:
+For a finite training set $ \{x_1, \dots, x_N\} $, the empirical data distribution is:
 
-\[
+$$
 p_{\text{data}}(x') = \frac{1}{N} \sum_{i=1}^{N} \delta(x' - x_i)
-\]
+$$
 
-The noisy distribution at noise level \( \sigma \) is obtained by convolving with Gaussian noise:
+The noisy distribution at noise level $ \sigma $ is obtained by convolving with Gaussian noise:
 
-\[
+$$
 p(x; \sigma) = p_{\text{data}} \ast \mathcal{N}(0, \sigma^2 I) = \int_{\mathbb{R}^d} p_{\text{data}}(x_0) \cdot \mathcal{N}(x; x_0, \sigma^2 I) \, dx_0
-\]
+$$
 
 Substituting the empirical distribution:
 
-\[
+$$
 p(x; \sigma) = \int_{\mathbb{R}^d} \left[\frac{1}{N} \sum_{i=1}^{N} \delta(x_0 - x_i)\right] \mathcal{N}(x; x_0, \sigma^2 I) \, dx_0
-\]
+$$
 
-\[
+$$
 = \frac{1}{N} \sum_{i=1}^{N} \int_{\mathbb{R}^d} \mathcal{N}(x; x_0, \sigma^2 I) \cdot \delta(x_0 - x_i) \, dx_0
-\]
+$$
 
-\[
+$$
 = \frac{1}{N} \sum_{i=1}^{N} \mathcal{N}(x; x_i, \sigma^2 I)
-\]
+$$
 
 #### Step 2: Denoising Score Matching Loss
 
 The denoising score matching loss is defined as:
 
-\[
+$$
 \mathcal{L}(D; \sigma) = \mathbb{E}_{x' \sim p_{\text{data}}} \, \mathbb{E}_{n \sim \mathcal{N}(0, \sigma^2 I)} \, \|D(x' + n; \sigma) - x'\|^2
-\]
+$$
 
-By expanding the expectations, we rewrite this as an integral over noisy samples \( x \):
+By expanding the expectations, we rewrite this as an integral over noisy samples $ x $:
 
-\[
+$$
 \mathcal{L}(D; \sigma) = \mathbb{E}_{x' \sim p_{\text{data}}} \, \mathbb{E}_{x \sim \mathcal{N}(x', \sigma^2 I)} \, \|D(x; \sigma) - x'\|^2
-\]
+$$
 
-\[
+$$
 = \mathbb{E}_{x' \sim p_{\text{data}}} \int_{\mathbb{R}^d} \mathcal{N}(x; x', \sigma^2 I) \, \|D(x; \sigma) - x'\|^2 \, dx
-\]
+$$
 
 Substituting the empirical distribution:
 
-\[
+$$
 = \frac{1}{N} \sum_{i=1}^{N} \int_{\mathbb{R}^d} \mathcal{N}(x; x_i, \sigma^2 I) \, \|D(x; \sigma) - x_i\|^2 \, dx
-\]
+$$
 
-\[
+$$
 = \int_{\mathbb{R}^d} \underbrace{\frac{1}{N} \sum_{i=1}^{N} \mathcal{N}(x; x_i, \sigma^2 I) \, \|D(x; \sigma) - x_i\|^2}_{=: \, \mathcal{L}(D; x, \sigma)} \, dx
-\]
+$$
 
 #### Step 3: Pointwise Optimization
 
-The above equation shows we can minimize \( \mathcal{L}(D; \sigma) \) by minimizing \( \mathcal{L}(D; x, \sigma) \) independently for each \( x \):
+The above equation shows we can minimize $ \mathcal{L}(D; \sigma) $ by minimizing $ \mathcal{L}(D; x, \sigma) $ independently for each $ x $:
 
-\[
+$$
 D(x; \sigma) = \arg\min_{D(x; \sigma)} \mathcal{L}(D; x, \sigma)
-\]
+$$
 
-This is a **convex optimization problem**. The optimal solution is found by setting the gradient with respect to \( D(x; \sigma) \) to zero:
+This is a **convex optimization problem**. The optimal solution is found by setting the gradient with respect to $ D(x; \sigma) $ to zero:
 
-\[
+$$
 \mathbf{0} = \nabla_{D(x; \sigma)} \left[\mathcal{L}(D; x, \sigma)\right]
-\]
+$$
 
-\[
+$$
 \mathbf{0} = \nabla_{D(x; \sigma)} \left[\frac{1}{N} \sum_{i=1}^{N} \mathcal{N}(x; x_i, \sigma^2 I) \, \|D(x; \sigma) - x_i\|^2\right]
-\]
+$$
 
-\[
+$$
 \mathbf{0} = \sum_{i=1}^{N} \mathcal{N}(x; x_i, \sigma^2 I) \, \nabla_{D(x; \sigma)} \left[\|D(x; \sigma) - x_i\|^2\right]
-\]
+$$
 
-Using the fact that \( \nabla_D \|D - x_i\|^2 = 2(D - x_i) \):
+Using the fact that $ \nabla_D \|D - x_i\|^2 = 2(D - x_i) $:
 
-\[
-\mathbf{0} = \sum_{i=1}^{N} \mathcal{N}(x; x_i, \sigma^2 I) \cdot [2D(x; \sigma) - 2x_i]
-\]
+$$
+\mathbf{0} = \sum_{i=1}^{N} \mathcal{N}(x; x_i, \sigma^2 I) \cdot $$2D(x; \sigma) - 2x_i$$
+$$
 
-\[
+$$
 \mathbf{0} = \left[\sum_{i=1}^{N} \mathcal{N}(x; x_i, \sigma^2 I)\right] D(x; \sigma) - \sum_{i=1}^{N} \mathcal{N}(x; x_i, \sigma^2 I) \cdot x_i
-\]
+$$
 
-Solving for \( D(x; \sigma) \):
+Solving for $ D(x; \sigma) $:
 
-\[
+$$
 \boxed{D(x; \sigma) = \frac{\sum_{i=1}^{N} \mathcal{N}(x; x_i, \sigma^2 I) \cdot x_i}{\sum_{i=1}^{N} \mathcal{N}(x; x_i, \sigma^2 I)}}
-\]
+$$
 
 This is the **closed-form solution** for the ideal denoiser (Equation 57).
 
 #### Step 4: Equivalence to Method 1
 
-Note that \( \mathcal{N}(x; x_i, \sigma^2 I) \propto \exp\left(-\frac{\|x - x_i\|^2}{2\sigma^2}\right) \), so:
+Note that $ \mathcal{N}(x; x_i, \sigma^2 I) \propto \exp\left(-\frac{\|x - x_i\|^2}{2\sigma^2}\right) $, so:
 
-\[
+$$
 D(x; \sigma) = \frac{\sum_{i=1}^{N} x_i \cdot \exp\left(-\frac{\|x - x_i\|^2}{2\sigma^2}\right)}{\sum_{i=1}^{N} \exp\left(-\frac{\|x - x_i\|^2}{2\sigma^2}\right)}
-\]
+$$
 
 This is **identical** to the formula derived in Method 1.
 
@@ -210,7 +210,7 @@ This is **identical** to the formula derived in Method 1.
 ### Key Insights from Both Methods
 
 **Method 1 (Bayesian)**: 
-- Shows that the ideal denoiser is the **posterior mean** \( \mathbb{E}[x' \mid x] \)
+- Shows that the ideal denoiser is the **posterior mean** $ \mathbb{E}$$x' \mid x$$ $
 - Provides a probabilistic interpretation
 - Natural from a Bayesian inference perspective
 
@@ -220,7 +220,7 @@ This is **identical** to the formula derived in Method 1.
 - Natural from a loss minimization perspective
 - Demonstrates the connection to **score matching**
 
-Both derivations are rigorous and arrive at the same closed-form solution, confirming that the formula is the unique optimal denoiser under the \( L^2 \) loss.
+Both derivations are rigorous and arrive at the same closed-form solution, confirming that the formula is the unique optimal denoiser under the $ L^2 $ loss.
 
 ## 3. Intuitive Understanding
 
@@ -228,57 +228,57 @@ Both derivations are rigorous and arrive at the same closed-form solution, confi
 
 The ideal denoiser computes a **weighted average** of all training images:
 
-\[
+$$
 D(x; \sigma) = \sum_{i=1}^{N} w_i \cdot x_i
-\]
+$$
 
 where the weights are:
 
-\[
+$$
 w_i = \frac{\exp\left(-\frac{\|x - x_i\|^2}{2\sigma^2}\right)}{\sum_{j=1}^{N} \exp\left(-\frac{\|x - x_j\|^2}{2\sigma^2}\right)}
-\]
+$$
 
 ### Interpretation
 
-- **Similar images get higher weight**: If \( x_i \) is close to the noisy input \( x \), then \( \|x - x_i\|^2 \) is small, and \( w_i \) is large.
-- **Dissimilar images get lower weight**: If \( x_i \) is far from \( x \), then \( w_i \) is small.
-- **Sigma controls similarity**: Larger \( \sigma \) makes the weights more uniform; smaller \( \sigma \) makes the weights more peaked.
+- **Similar images get higher weight**: If $ x_i $ is close to the noisy input $ x $, then $ \|x - x_i\|^2 $ is small, and $ w_i $ is large.
+- **Dissimilar images get lower weight**: If $ x_i $ is far from $ x $, then $ w_i $ is small.
+- **Sigma controls similarity**: Larger $ \sigma $ makes the weights more uniform; smaller $ \sigma $ makes the weights more peaked.
 
 ## 4. Special Cases
 
-### Case 1: Zero Noise (\( \sigma \to 0 \))
+### Case 1: Zero Noise ($ \sigma \to 0 $)
 
-When \( \sigma \to 0 \):
+When $ \sigma \to 0 $:
 
-\[
+$$
 D(x; \sigma) \to x_{\text{nearest}}
-\]
+$$
 
 The denoiser returns the **nearest neighbor** from the training set.
 
-**Proof**: As \( \sigma \to 0 \), the weight \( w_i \) for the closest training image dominates all others.
+**Proof**: As $ \sigma \to 0 $, the weight $ w_i $ for the closest training image dominates all others.
 
-### Case 2: Infinite Noise (\( \sigma \to \infty \))
+### Case 2: Infinite Noise ($ \sigma \to \infty $)
 
-When \( \sigma \to \infty \):
+When $ \sigma \to \infty $:
 
-\[
+$$
 D(x; \sigma) \to \frac{1}{N} \sum_{i=1}^{N} x_i = \bar{x}
-\]
+$$
 
 The denoiser returns the **mean** of all training images.
 
-**Proof**: As \( \sigma \to \infty \), all weights become equal: \( w_i \to 1/N \).
+**Proof**: As $ \sigma \to \infty $, all weights become equal: $ w_i \to 1/N $.
 
-### Case 3: Exact Match (\( x = x_k \) for some \( k \))
+### Case 3: Exact Match ($ x = x_k $ for some $ k $)
 
 If the noisy input exactly matches a training image:
 
-\[
+$$
 D(x; \sigma) \approx x_k
-\]
+$$
 
-for small \( \sigma \).
+for small $ \sigma $.
 
 ## 5. Connection to Score Matching
 
@@ -286,9 +286,9 @@ for small \( \sigma \).
 
 The **score function** is the gradient of the log-density:
 
-\[
+$$
 \nabla_x \log p(x; \sigma) = -\frac{1}{\sigma^2}(x - D(x; \sigma))
-\]
+$$
 
 This relates the ideal denoiser to the **score** of the noisy distribution.
 
@@ -296,41 +296,41 @@ This relates the ideal denoiser to the **score** of the noisy distribution.
 
 The ideal denoiser can be written as:
 
-\[
+$$
 D(x; \sigma) = x + \sigma^2 \nabla_x \log p(x; \sigma)
-\]
+$$
 
 This is known as **Tweedie's formula** in statistics.
 
 ### Derivation of Score-Denoiser Relationship
 
-Taking the gradient of \( \log p(x; \sigma) \):
+Taking the gradient of $ \log p(x; \sigma) $:
 
-\[
+$$
 \nabla_x \log p(x; \sigma) = \nabla_x \log \left[\frac{1}{N} \sum_{i=1}^{N} \mathcal{N}(x; x_i, \sigma^2 I)\right]
-\]
+$$
 
-\[
+$$
 = \frac{1}{p(x; \sigma)} \nabla_x p(x; \sigma)
-\]
+$$
 
-\[
+$$
 = \frac{1}{p(x; \sigma)} \cdot \frac{1}{N} \sum_{i=1}^{N} \nabla_x \mathcal{N}(x; x_i, \sigma^2 I)
-\]
+$$
 
-Using \( \nabla_x \mathcal{N}(x; x_i, \sigma^2 I) = -\frac{1}{\sigma^2}(x - x_i) \mathcal{N}(x; x_i, \sigma^2 I) \):
+Using $ \nabla_x \mathcal{N}(x; x_i, \sigma^2 I) = -\frac{1}{\sigma^2}(x - x_i) \mathcal{N}(x; x_i, \sigma^2 I) $:
 
-\[
+$$
 = -\frac{1}{\sigma^2 p(x; \sigma)} \cdot \frac{1}{N} \sum_{i=1}^{N} (x - x_i) \mathcal{N}(x; x_i, \sigma^2 I)
-\]
+$$
 
-\[
+$$
 = -\frac{1}{\sigma^2} \left[x - \frac{\sum_{i=1}^{N} x_i \mathcal{N}(x; x_i, \sigma^2 I)}{\sum_{i=1}^{N} \mathcal{N}(x; x_i, \sigma^2 I)}\right]
-\]
+$$
 
-\[
+$$
 = -\frac{1}{\sigma^2}(x - D(x; \sigma))
-\]
+$$
 
 This proves the fundamental relationship between the score function and the ideal denoiser.
 
@@ -338,62 +338,62 @@ This proves the fundamental relationship between the score function and the idea
 
 ### Time Complexity
 
-Computing \( D(x; \sigma) \) requires:
+Computing $ D(x; \sigma) $ requires:
 
-1. **Distance computation**: \( O(N \times d) \) where \( d = C \times H \times W \)
-2. **Weight computation**: \( O(N) \)
-3. **Weighted sum**: \( O(N \times d) \)
+1. **Distance computation**: $ O(N \times d) $ where $ d = C \times H \times W $
+2. **Weight computation**: $ O(N) $
+3. **Weighted sum**: $ O(N \times d) $
 
-**Total**: \( O(N \times d) \) per query
+**Total**: $ O(N \times d) $ per query
 
 For CIFAR-10:
-- \( N = 50,000 \) training images
-- \( d = 3 \times 32 \times 32 = 3,072 \) dimensions
+- $ N = 50,000 $ training images
+- $ d = 3 \times 32 \times 32 = 3,072 $ dimensions
 - **Total**: ~150 million operations per denoising
 
 ### Memory Complexity
 
 Storing the training set requires:
 
-\[
+$$
 \text{Memory} = N \times C \times H \times W \times \text{bytes per pixel}
-\]
+$$
 
 For CIFAR-10 with float32:
-- \( 50,000 \times 3 \times 32 \times 32 \times 4 = 600 \text{ MB} \)
+- $ 50,000 \times 3 \times 32 \times 32 \times 4 = 600 \text{ MB} $
 
 ### Numerical Stability
 
 The direct computation of weights:
 
-\[
+$$
 w_i = \frac{\exp(-\|x - x_i\|^2 / (2\sigma^2))}{\sum_j \exp(-\|x - x_j\|^2 / (2\sigma^2))}
-\]
+$$
 
-can cause **numerical overflow** when \( \sigma \) is small or distances are large.
+can cause **numerical overflow** when $ \sigma $ is small or distances are large.
 
 #### Log-Sum-Exp Trick
 
 To improve stability, we use:
 
-\[
+$$
 \log w_i = -\frac{\|x - x_i\|^2}{2\sigma^2} - \log \sum_j \exp\left(-\frac{\|x - x_j\|^2}{2\sigma^2}\right)
-\]
+$$
 
-Let \( M = \max_j \left(-\frac{\|x - x_j\|^2}{2\sigma^2}\right) \), then:
+Let $ M = \max_j \left(-\frac{\|x - x_j\|^2}{2\sigma^2}\right) $, then:
 
-\[
+$$
 \log \sum_j \exp\left(-\frac{\|x - x_j\|^2}{2\sigma^2}\right) = M + \log \sum_j \exp\left(-\frac{\|x - x_j\|^2}{2\sigma^2} - M\right)
-\]
+$$
 
-This ensures all exponentials are in the range \( [0, 1] \).
+This ensures all exponentials are in the range $ $$0, 1$$ $.
 
 ## 7. Comparison with Neural Denoisers
 
 | Aspect | Ideal Denoiser | Neural Denoiser |
 |--------|----------------|-----------------|
 | **Knowledge** | Full training set | Learned parameters |
-| **Computation** | \( O(N \times d) \) | \( O(d) \) |
+| **Computation** | $ O(N \times d) $ | $ O(d) $ |
 | **Memory** | Stores entire dataset | Stores network weights |
 | **Performance** | Optimal (theoretical upper bound) | Approximates optimal |
 | **Scalability** | Poor (increases with dataset size) | Good (fixed size) |
@@ -401,7 +401,7 @@ This ensures all exponentials are in the range \( [0, 1] \).
 ### Why Use Neural Networks?
 
 Neural networks **approximate** the ideal denoiser but with:
-- **Constant computation**: \( O(d) \) regardless of dataset size
+- **Constant computation**: $ O(d) $ regardless of dataset size
 - **Compact representation**: Store only network weights
 - **Generalization**: Can denoise images outside the training set
 
@@ -412,18 +412,18 @@ Neural networks **approximate** the ideal denoiser but with:
 ```python
 def ideal_denoiser(x_noisy, sigma, x_train):
     # Compute distances
-    norm2 = ((x_train[:, None] - x_noisy[None, :]) ** 2).sum(dim=(2,3,4))
+    norm2 = ((x_train$$:, None$$ - x_noisy$$None, :$$) ** 2).sum(dim=(2,3,4))
     
     # Compute log weights (with numerical stability)
     log_weights = -norm2 / (2 * sigma ** 2)
-    delta = log_weights.max(dim=0, keepdim=True)[0]
+    delta = log_weights.max(dim=0, keepdim=True)$$0$$
     weights = (log_weights - delta).exp()
     
     # Weighted average
-    numerator = (weights[:, :, None, None, None] * x_train[:, None]).sum(dim=0)
+    numerator = (weights$$:, :, None, None, None$$ * x_train$$:, None$$).sum(dim=0)
     denominator = weights.sum(dim=0)
     
-    return numerator / denominator[:, None, None, None]
+    return numerator / denominator$$:, None, None, None$$
 ```
 
 ### Batch Processing
@@ -442,21 +442,21 @@ denoised = ideal_denoiser(x_noisy, sigma, x_train)  # (B, C, H, W)
 
 Replace Gaussian kernel with other kernels:
 
-\[
+$$
 D(x; \sigma) = \frac{\sum_i K(x, x_i) \cdot x_i}{\sum_i K(x, x_i)}
-\]
+$$
 
-where \( K(x, x_i) \) is any positive kernel function.
+where $ K(x, x_i) $ is any positive kernel function.
 
 ### 2. Local Denoising
 
-Use only \( k \) nearest neighbors:
+Use only $ k $ nearest neighbors:
 
-\[
+$$
 D(x; \sigma) = \frac{\sum_{i \in \mathcal{N}_k(x)} \exp(-\|x - x_i\|^2 / (2\sigma^2)) \cdot x_i}{\sum_{i \in \mathcal{N}_k(x)} \exp(-\|x - x_i\|^2 / (2\sigma^2))}
-\]
+$$
 
-where \( \mathcal{N}_k(x) \) are the \( k \) nearest neighbors.
+where $ \mathcal{N}_k(x) $ are the $ k $ nearest neighbors.
 
 ### 3. Anisotropic Denoising
 
