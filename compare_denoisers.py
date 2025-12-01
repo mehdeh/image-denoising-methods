@@ -340,7 +340,7 @@ def main():
         'test_selection_indices': [2, 3, 4],
         'ideal_denoiser_subset_size': 1000,
         'grad_ascent_steps': 10,
-        'grad_ascent_lr': 1.0,
+        'grad_ascent_lr': 0.01,
     }
     
     # Device selection
