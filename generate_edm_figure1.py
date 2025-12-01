@@ -23,14 +23,14 @@ import os
 import matplotlib.pyplot as plt
 
 # Import from modular structure
-from denoisers.ideal_denoiser import ideal_denoiser
+from ideal_denoiser import ideal_denoiser
 from utils.noise_utils import add_gaussian_noise
 from utils.image_utils import load_cifar10_dataset, load_cifar10_subset, normalize_for_display
 from utils.visualization import create_labeled_figure
 
 
 # Note: Functions now imported from modular structure
-# - ideal_denoiser from denoisers.ideal_denoiser
+# - ideal_denoiser from ideal_denoiser
 # - add_gaussian_noise from utils.noise_utils
 # - normalize_for_display from utils.image_utils
 # - load_cifar10_dataset from utils.image_utils

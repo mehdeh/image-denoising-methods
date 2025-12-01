@@ -39,10 +39,16 @@ D(x; σ) = Σᵢ [xᵢ · exp(-||x - xᵢ||² / (2σ²))] / Σᵢ [exp(-||x - x�
 
 ```
 image-denoising-methods/
-├── denoisers/                   # Denoising method implementations
-│   ├── __init__.py
-│   ├── ideal_denoiser.py       # Ideal denoiser (Equation 57)
-│   ├── edm_denoiser.py         # EDM neural network denoiser
+├── ideal_denoiser/              # Ideal denoiser package (Equation 57)
+│   ├── __init__.py             # Package exports
+│   └── core.py                 # Main implementation
+│
+├── edm_denoiser/                # EDM neural network denoiser package
+│   ├── __init__.py             # Package exports
+│   ├── core.py                 # Main denoising function
+│   ├── model_loader.py         # Model loading and downloading
+│   ├── score.py                # Score function and gradient ascent
+│   ├── utils.py                # Helper utilities
 │   └── edm/                    # EDM dependencies (CC BY-NC-SA 4.0)
 │       ├── dnnlib/             # Deep learning utilities from NVlabs/edm
 │       ├── torch_utils/        # PyTorch utilities from NVlabs/edm
@@ -57,21 +63,16 @@ image-denoising-methods/
 │   ├── model_utils.py          # Model download utilities
 │   └── visualization.py        # Plotting and visualization
 │
-├── draft_codes/                 # Experimental code
 ├── data/                        # Dataset storage (auto-downloaded)
 ├── pretrain_models/             # Pretrained EDM models (auto-downloaded)
 ├── results/                     # Output directory
 │   ├── edm_figure1/            # EDM Figure 1 results
-│   └── denoiser_comparison/    # Comparison between ideal and EDM denoisers
+│   └── denoiser_comparison/    # Comparison results
 │
 ├── generate_edm_figure1.py     # Reproduce EDM Figure 1
-├── compare_denoisers.py        # Compare ideal vs EDM vs gradient ascent denoisers
+├── compare_denoisers.py        # Compare all denoising methods
 ├── requirements.txt            # Dependencies
-├── README.md                   # This file
-├── PROJECT_STRUCTURE.md        # Detailed architecture documentation
-├── README_FIGURE1.md           # Figure 1 documentation
-├── MATHEMATICAL_BACKGROUND.md  # Mathematical details
-└── REFACTORING_NOTES.md        # Development notes
+└── README.md                   # This file
 ```
 
 See [`PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md) for detailed architecture documentation.
@@ -87,7 +88,7 @@ cd image-denoising-methods
 # Install dependencies
 pip install -r requirements.txt
 
-# Note: EDM dependencies (dnnlib, torch_utils) are included in denoisers/edm/
+# Note: EDM dependencies (dnnlib, torch_utils) are included in edm_denoiser/edm/
 # No additional installation needed for pretrained models
 ```
 
@@ -130,8 +131,8 @@ This will:
 
 ```python
 # Import denoising methods
-from denoisers.ideal_denoiser import ideal_denoiser
-from denoisers.edm_denoiser import load_pretrained_edm, edm_denoise
+from ideal_denoiser import ideal_denoiser
+from edm_denoiser import load_pretrained_edm, edm_denoise
 
 # Import utilities
 from utils.noise_utils import add_gaussian_noise
@@ -188,7 +189,7 @@ Each figure shows:
 ### Example 1: Basic Ideal Denoiser
 
 ```python
-from denoisers.ideal_denoiser import ideal_denoiser
+from ideal_denoiser import ideal_denoiser
 from utils.noise_utils import add_gaussian_noise
 from utils.image_utils import load_cifar10_dataset
 
@@ -204,7 +205,7 @@ denoised_img = ideal_denoiser(noisy_img, sigma, train_images)
 ### Example 2: EDM Pretrained Model
 
 ```python
-from denoisers.edm_denoiser import load_pretrained_edm, edm_denoise
+from edm_denoiser import load_pretrained_edm, edm_denoise
 from utils.noise_utils import add_gaussian_noise
 
 # Load pretrained model
@@ -218,7 +219,7 @@ denoised_img = edm_denoise(model, noisy_img, sigma=3.0)
 ### Example 3: Gradient Ascent Denoising
 
 ```python
-from denoisers.edm_denoiser import load_pretrained_edm, gradient_ascent_denoise
+from edm_denoiser import load_pretrained_edm, gradient_ascent_denoise
 
 model, _ = load_pretrained_edm('cifar10-uncond')
 
@@ -250,8 +251,8 @@ Verify your installation:
 
 ```bash
 # Test imports
-python -c "from denoisers.ideal_denoiser import ideal_denoiser; print('✓ OK')"
-python -c "from denoisers.edm_denoiser import load_edm_model; print('✓ OK')"
+python -c "from ideal_denoiser import ideal_denoiser; print('✓ OK')"
+python -c "from edm_denoiser import load_edm_model; print('✓ OK')"
 python -c "from utils.noise_utils import add_gaussian_noise; print('✓ OK')"
 
 # Generate Figure 1 (ideal denoiser only)
@@ -291,12 +292,18 @@ python test_gradient_ascent_fix.py         # Comprehensive test
 
 ## 🔧 Adding New Denoising Methods
 
-The modular architecture makes it easy to add new methods:
+The modular architecture makes it easy to add new methods. You can create a new top-level package or add to existing ones:
 
-### Step 1: Create a new denoiser module
+### Option 1: Create a new top-level package
+
+```
+my_denoiser/
+├── __init__.py
+└── core.py
+```
 
 ```python
-# denoisers/my_denoiser.py
+# my_denoiser/core.py
 """
 My Custom Denoiser Implementation
 """
@@ -324,17 +331,16 @@ def my_denoise(noisy_images, sigma, **kwargs):
     return denoised
 ```
 
-### Step 2: Register in `denoisers/__init__.py`
-
 ```python
-from .my_denoiser import my_denoise
-__all__.append('my_denoise')
+# my_denoiser/__init__.py
+from .core import my_denoise
+__all__ = ['my_denoise']
 ```
 
-### Step 3: Use it!
+### Usage
 
 ```python
-from denoisers.my_denoiser import my_denoise
+from my_denoiser import my_denoise
 from utils.noise_utils import add_gaussian_noise
 
 noisy = add_gaussian_noise(images, sigma=2.0)
@@ -436,8 +442,8 @@ This project contains code from multiple sources with different licenses:
 ### Main Project Code
 The core implementation (ideal denoiser, utilities, scripts) is provided without restrictions and can be freely used, modified, and distributed.
 
-### EDM Dependencies (denoisers/edm/)
-The `denoisers/edm/` directory contains code from the [NVlabs/edm](https://github.com/NVlabs/edm) repository:
+### EDM Dependencies (`edm_denoiser/edm/`)
+The `edm_denoiser/edm/` directory contains code from the [NVlabs/edm](https://github.com/NVlabs/edm) repository:
 
 - **License**: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)
 - **Copyright**: © 2022, NVIDIA CORPORATION & AFFILIATES
@@ -463,8 +469,8 @@ The `denoisers/edm/` directory contains code from the [NVlabs/edm](https://githu
 ```
 
 For full license details, see:
-- `denoisers/edm/LICENSE.txt` - Full license text
-- `denoisers/edm/NOTICE.txt` - Attribution and citation information
+- `edm_denoiser/edm/LICENSE.txt` - Full license text
+- `edm_denoiser/edm/NOTICE.txt` - Attribution and citation information
 - http://creativecommons.org/licenses/by-nc-sa/4.0/
 
 ### Pretrained Models

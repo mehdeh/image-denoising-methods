@@ -27,8 +27,8 @@ from tqdm import tqdm
 import os
 
 # Import from modular structure
-from denoisers.ideal_denoiser import ideal_denoiser
-from denoisers.edm_denoiser import load_pretrained_edm, edm_denoise, gradient_ascent_denoise
+from ideal_denoiser import ideal_denoiser
+from edm_denoiser import load_pretrained_edm, edm_denoise, gradient_ascent_denoise
 from utils.noise_utils import add_gaussian_noise
 from utils.image_utils import load_cifar10_subset, normalize_for_display
 from utils.visualization import create_comparison_figure

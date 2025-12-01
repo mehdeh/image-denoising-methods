@@ -59,7 +59,7 @@ def ideal_denoiser(x_noisy, sigma, x_all):
     Examples:
     ---------
     >>> import torch
-    >>> from denoisers.ideal_denoiser import ideal_denoiser
+    >>> from ideal_denoiser import ideal_denoiser
     >>> from utils.noise_utils import add_gaussian_noise
     >>> 
     >>> # Create sample data
@@ -98,4 +98,3 @@ def ideal_denoiser(x_noisy, sigma, x_all):
     denoised = numerator.sum(dim=0) / denominator[:, None, None, None]  # (B, C, H, W)
     
     return denoised
-
