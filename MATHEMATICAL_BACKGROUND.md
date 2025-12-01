@@ -370,23 +370,56 @@ $$
 w_i = \frac{\exp(-\|x - x_i\|^2 / (2\sigma^2))}{\sum_j \exp(-\|x - x_j\|^2 / (2\sigma^2))}
 $$
 
-can cause **numerical overflow** when $\sigma$ is small or distances are large.
+can cause **numerical overflow/underflow** when $\sigma$ is small or distances are large.
 
 #### Log-Sum-Exp Trick
 
-To improve stability, we use:
+To improve stability, we use the **log-sum-exp trick** which prevents numerical overflow by subtracting the maximum value before computing exponentials.
+
+**Original Formula (Numerically Unstable):**
 
 $$
-\log w_i = -\frac{\|x - x_i\|^2}{2\sigma^2} - \log \sum_j \exp\left(-\frac{\|x - x_j\|^2}{2\sigma^2}\right)
+D(x; \sigma) = \frac{\sum_{i=1}^{N} x_i \cdot \exp\left(-\frac{\|x - x_i\|^2}{2\sigma^2}\right)}{\sum_{i=1}^{N} \exp\left(-\frac{\|x - x_i\|^2}{2\sigma^2}\right)}
 $$
 
-Let $M = \max_j \left(-\frac{\|x - x_j\|^2}{2\sigma^2}\right)$, then:
+**Problem**: When $\sigma$ is small or $\|x - x_i\|^2$ is large, the exponential terms can underflow to zero or the computation becomes numerically unstable.
+
+**Solution**: Define the log-probability for each training sample:
 
 $$
-\log \sum_j \exp\left(-\frac{\|x - x_j\|^2}{2\sigma^2}\right) = M + \log \sum_j \exp\left(-\frac{\|x - x_j\|^2}{2\sigma^2} - M\right)
+\ell_i = -\frac{\|x - x_i\|^2}{2\sigma^2}
 $$
 
-This ensures all exponentials are in the range $[0, 1]$.
+Compute the maximum log-probability:
+
+$$
+\delta = \max_{j=1,\ldots,N} \ell_j = \max_{j=1,\ldots,N} \left(-\frac{\|x - x_j\|^2}{2\sigma^2}\right)
+$$
+
+**Numerically Stable Formula:**
+
+$$
+D(x; \sigma) = \frac{\sum_{i=1}^{N} x_i \cdot \exp(\ell_i - \delta)}{\sum_{i=1}^{N} \exp(\ell_i - \delta)}
+$$
+
+Expanding:
+
+$$
+\boxed{D(x; \sigma) = \frac{\sum_{i=1}^{N} x_i \cdot \exp\left(-\frac{\|x - x_i\|^2}{2\sigma^2} - \delta\right)}{\sum_{i=1}^{N} \exp\left(-\frac{\|x - x_i\|^2}{2\sigma^2} - \delta\right)}}
+$$
+
+**Why This Works:**
+
+1. **Subtract maximum**: By subtracting $\delta$ from all log-probabilities, the largest value becomes 0
+2. **Bounded exponentials**: All exponentials $\exp(\ell_i - \delta)$ are now in the range $(0, 1]$
+3. **Numerically stable**: Prevents both overflow and underflow
+4. **Equivalent result**: Since $\delta$ appears in both numerator and denominator, it cancels out:
+
+$$
+D(x; \sigma) = \frac{\sum_i x_i \cdot \exp(\ell_i - \delta)}{\sum_i \exp(\ell_i - \delta)} = \frac{\exp(-\delta) \sum_i x_i \cdot \exp(\ell_i)}{\exp(-\delta) \sum_i \exp(\ell_i)} = \frac{\sum_i x_i \cdot \exp(\ell_i)}{\sum_i \exp(\ell_i)}
+$$
+
+**Implementation Note**: This is the technique used in the code at lines 86-87 of `ideal_denoiser/core.py`, where `delta` is computed as the maximum of `sigma_norm2` values.
 
 ## 7. Comparison with Neural Denoisers
 
