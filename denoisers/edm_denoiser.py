@@ -435,8 +435,6 @@ def gradient_ascent_denoise(
         return x_current, trajectory
     else:
         return x_current
-
-
 # Predefined model configurations
 EDM_PRETRAINED_MODELS = {
     'cifar10-uncond-vp': {

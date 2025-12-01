@@ -44,7 +44,7 @@ def process_images_at_sigma(
     grad_ascent_lr: float = 0.1
 ) -> tuple:
     """
-    Process images at a specific noise level with all three denoisers.
+    Process images at a specific noise level with all denoisers.
     
     Parameters:
     -----------
@@ -66,7 +66,7 @@ def process_images_at_sigma(
     Returns:
     --------
     tuple : (noisy, ideal_denoised, edm_denoised, grad_ascent_denoised)
-        Four tensors containing the noisy images and all three denoised versions
+        Four tensors containing the noisy images and all denoised versions
     """
     # Handle sigma = 0 case
     if sigma == 0:
@@ -74,10 +74,11 @@ def process_images_at_sigma(
             selected_images.clone(),
             selected_images.clone(),
             selected_images.clone(),
+            selected_images.clone(),
             selected_images.clone()
         )
     
-    # Add noise
+    # Add noise (in float32, matching how data is loaded)
     noisy_batch = add_gaussian_noise(selected_images, sigma)
     
     # Denoise with ideal denoiser
@@ -96,7 +97,7 @@ def process_images_at_sigma(
             sigma
         )
     
-    # Denoise with gradient ascent
+    # Denoise with gradient ascent (EDM score-based, new implementation)
     with torch.no_grad():
         grad_ascent_denoised_batch = gradient_ascent_denoise(
             edm_model,
@@ -104,7 +105,8 @@ def process_images_at_sigma(
             sigma,
             num_steps=grad_ascent_steps,
             lr=grad_ascent_lr,
-            return_trajectory=False
+            return_trajectory=False,
+            use_float64=True
         )
     
     return noisy_batch, ideal_denoised_batch, edm_denoised_batch, grad_ascent_denoised_batch
@@ -334,13 +336,13 @@ def main():
     config = {
         'data_root': "./data",
         'save_dir': "./results/denoiser_comparison",
-        'sigma_values': [0, 0.2, 0.5, 1, 2, 3, 5, 7, 10, 20, 50],
+        'sigma_values': [0, 0.2, 0.5, 1, 2, 3, 5],#7, 10, 20, 50],
         'max_samples_for_selection': 10,
         'train_selection_indices': [2, 3, 4],
         'test_selection_indices': [2, 3, 4],
         'ideal_denoiser_subset_size': 1000,
         'grad_ascent_steps': 10,
-        'grad_ascent_lr': 0.01,
+        'grad_ascent_lr': 1.0
     }
     
     # Device selection
