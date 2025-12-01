@@ -6,16 +6,16 @@ This document explains the mathematical theory behind the ideal denoiser impleme
 
 ### Noise Model
 
-Given a clean image $$ x' \sim p_{\text{data}} $$, we observe a noisy version:
+Given a clean image $x' \sim p_{\text{data}}$, we observe a noisy version:
 
 $$
 x = x' + n, \quad n \sim \mathcal{N}(0, \sigma^2 I)
 $$
 
 where:
-- $$ x' $$: clean image from the data distribution
-- /(x /) : noisy observation
-- /[ n /]$: Gaussian noise with standard deviation $ \sigma $
+- $$x'$$: clean image from the data distribution
+- /(x/) : noisy observation
+- /[n /]$: Gaussian noise with standard deviation $ \sigma $
 
 ### Denoising Goal
 
