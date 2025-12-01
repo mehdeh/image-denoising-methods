@@ -22,7 +22,7 @@ where:
 The ideal denoiser aims to recover the clean image by computing:
 
 $$
-D(x; \sigma) = \mathbb{E}$$x' \mid x$$ = \int x' \cdot p(x' \mid x) \, dx'
+D(x; \sigma) = \mathbb{E}[x' \mid x] = \int x' \cdot p(x' \mid x) \, dx'
 $$
 
 This is the **posterior mean** - the expected value of the clean image given the noisy observation.
@@ -180,7 +180,7 @@ $$
 Using the fact that $ \nabla_D \|D - x_i\|^2 = 2(D - x_i) $:
 
 $$
-\mathbf{0} = \sum_{i=1}^{N} \mathcal{N}(x; x_i, \sigma^2 I) \cdot $$2D(x; \sigma) - 2x_i$$
+\mathbf{0} = \sum_{i=1}^{N} \mathcal{N}(x; x_i, \sigma^2 I) \cdot [2D(x; \sigma) - 2x_i]
 $$
 
 $$
@@ -210,7 +210,7 @@ This is **identical** to the formula derived in Method 1.
 ### Key Insights from Both Methods
 
 **Method 1 (Bayesian)**: 
-- Shows that the ideal denoiser is the **posterior mean** $ \mathbb{E}$$x' \mid x$$ $
+- Shows that the ideal denoiser is the **posterior mean** $ \mathbb{E}[x' \mid x] $
 - Provides a probabilistic interpretation
 - Natural from a Bayesian inference perspective
 
@@ -386,7 +386,7 @@ $$
 \log \sum_j \exp\left(-\frac{\|x - x_j\|^2}{2\sigma^2}\right) = M + \log \sum_j \exp\left(-\frac{\|x - x_j\|^2}{2\sigma^2} - M\right)
 $$
 
-This ensures all exponentials are in the range $ $$0, 1$$ $.
+This ensures all exponentials are in the range $ [0, 1] $.
 
 ## 7. Comparison with Neural Denoisers
 
@@ -412,18 +412,18 @@ Neural networks **approximate** the ideal denoiser but with:
 ```python
 def ideal_denoiser(x_noisy, sigma, x_train):
     # Compute distances
-    norm2 = ((x_train$$:, None$$ - x_noisy$$None, :$$) ** 2).sum(dim=(2,3,4))
+    norm2 = ((x_train[:, None] - x_noisy[None, :]) ** 2).sum(dim=(2,3,4))
     
     # Compute log weights (with numerical stability)
     log_weights = -norm2 / (2 * sigma ** 2)
-    delta = log_weights.max(dim=0, keepdim=True)$$0$$
+    delta = log_weights.max(dim=0, keepdim=True)[0]
     weights = (log_weights - delta).exp()
     
     # Weighted average
-    numerator = (weights$$:, :, None, None, None$$ * x_train$$:, None$$).sum(dim=0)
+    numerator = (weights[:, :, None, None, None] * x_train[:, None]).sum(dim=0)
     denominator = weights.sum(dim=0)
     
-    return numerator / denominator$$:, None, None, None$$
+    return numerator / denominator[:, None, None, None]
 ```
 
 ### Batch Processing
