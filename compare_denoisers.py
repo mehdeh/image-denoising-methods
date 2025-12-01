@@ -74,7 +74,6 @@ def process_images_at_sigma(
             selected_images.clone(),
             selected_images.clone(),
             selected_images.clone(),
-            selected_images.clone(),
             selected_images.clone()
         )
     
