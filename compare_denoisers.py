@@ -34,7 +34,7 @@ from datetime import datetime
 # Import from modular structure
 from utils.core import load_cifar10_subset
 from utils.processing import generate_denoiser_comparison
-from edm_denoiser.model_loader import load_edm_model_wrapper
+from edm_denoiser import load_pretrained_edm
 
 
 def parse_arguments():
@@ -163,9 +163,27 @@ def main():
     
     # Load EDM model (required for EDM and gradient ascent denoisers)
     if 'edm' in args.denoisers or 'grad-ascent' in args.denoisers:
-        edm_model, edm_config = load_edm_model_wrapper(device)
-        if edm_model is None:
-            print("\n✗ Cannot proceed without EDM model for EDM/gradient ascent denoisers")
+        print("\n" + "="*80)
+        print("Loading pretrained EDM model...")
+        print("="*80)
+        
+        try:
+            edm_model, edm_config = load_pretrained_edm('cifar10-uncond', device=device)
+            print(f"✓ EDM model loaded successfully")
+            print(f"  Architecture: {edm_config['architecture']}")
+            print(f"  Resolution: {edm_config['resolution']}x{edm_config['resolution']}")
+            print(f"  Conditional: {edm_config['conditional']}")
+        except ModuleNotFoundError as e:
+            print(f"✗ Failed to load EDM model: {e}")
+            print("\nThe EDM pretrained models require the EDM codebase to be installed.")
+            print("\nPlease install EDM dependencies:")
+            print("  pip install git+https://github.com/NVlabs/edm.git")
+            print("\nNote: The model file will be downloaded automatically (~226MB)")
+            print("      if not already present in ./pretrain_models/")
+            return
+        except Exception as e:
+            print(f"✗ Failed to load EDM model: {e}")
+            print("\nPlease ensure you have the required dependencies.")
             return
     else:
         edm_model = None

@@ -21,12 +21,11 @@ if _edm_path not in sys.path:
     sys.path.insert(0, _edm_path)
 
 # Import main functions from submodules
-from .model_loader import load_edm_model, load_pretrained_edm
+from .model_loader import load_pretrained_edm
 from .core import edm_denoise
 from .score import compute_score_gradient, gradient_ascent_denoise
 
 __all__ = [
-    'load_edm_model',
     'load_pretrained_edm',
     'edm_denoise',
     'compute_score_gradient',
