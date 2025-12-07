@@ -1,47 +1,23 @@
-# Image Denoising Methods - Modular Framework
+# Image Denoising Methods Comparison
 
-[![Paper](https://img.shields.io/badge/Paper-arXiv-red)](https://arxiv.org/abs/2206.00364)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-
-This repository contains a **modular framework** for implementing and comparing various image denoising methods, with a focus on methods from the paper:
-
-> **Elucidating the Design Space of Diffusion-Based Generative Models**  
-> Tero Karras, Miika Aittala, Timo Aila, Samuli Laine  
-> NeurIPS 2022
+A framework for comparing different image denoising methods on CIFAR-10 dataset.
 
 ## 📖 Overview
 
-This framework provides:
+This repository provides a comparison framework for evaluating multiple image denoising methods:
 
-1. **Ideal Denoiser**: Theoretical optimal denoiser using closed-form solution (Equation 57)
-2. **EDM Denoiser**: Pretrained neural network-based denoiser from the EDM paper (one-step)
-3. **Gradient Ascent Denoiser**: Iterative denoising using score function optimization
-4. **Modular Architecture**: Easy to extend with new denoising methods
-5. **Common Utilities**: Shared tools for noise generation, data loading, and visualization
+1. **Ideal Denoiser** - Theoretical optimal denoiser using closed-form solution (Equation 57 from EDM paper)
+2. **EDM Denoiser** - Pretrained neural network-based denoiser from the EDM paper (one-step)
+3. **Gradient Ascent Denoiser** - Iterative denoising using score function optimization
 
-### Ideal Denoiser Formula
-
-```
-D(x; σ) = Σᵢ [xᵢ · exp(-||x - xᵢ||² / (2σ²))] / Σᵢ [exp(-||x - xᵢ||² / (2σ²))]
-```
-
-## 🎯 Features
-
-- ✅ **Modular Design**: Easy to add new denoising methods
-- ✅ **Clean Code**: Well-documented with comprehensive examples
-- ✅ **Multiple Methods**: Ideal denoiser + EDM neural network denoiser + Gradient ascent denoiser
-- ✅ **Reproduces EDM Figure 1**: Generate paper figures with one command
-- ✅ **Efficient**: Optimized PyTorch implementation
-- ✅ **Flexible**: CPU and GPU support, batch processing
-- ✅ **Extensible**: Template for adding new methods
+The goal is to visually compare the performance of different denoising approaches across various noise levels.
 
 ## 📁 Project Structure
 
 ```
 image-denoising-methods/
-├── ideal_denoiser/              # Ideal denoiser package (Equation 57)
-│   ├── __init__.py             # Package exports
-│   └── core.py                 # Main implementation
+├── ideal_denoiser/              # Ideal denoiser module
+│   └── ideal_denoiser.py       # Implementation from ideal-denoiser repository
 │
 ├── edm_denoiser/                # EDM neural network denoiser package
 │   ├── __init__.py             # Package exports
@@ -53,8 +29,7 @@ image-denoising-methods/
 │       ├── dnnlib/             # Deep learning utilities from NVlabs/edm
 │       ├── torch_utils/        # PyTorch utilities from NVlabs/edm
 │       ├── LICENSE.txt         # EDM license information
-│       ├── NOTICE.txt          # Attribution and citation
-│       └── __init__.py
+│       └── NOTICE.txt          # Attribution and citation
 │
 ├── utils/                       # Common utilities
 │   ├── __init__.py
@@ -65,17 +40,12 @@ image-denoising-methods/
 │
 ├── data/                        # Dataset storage (auto-downloaded)
 ├── pretrain_models/             # Pretrained EDM models (auto-downloaded)
-├── results/                     # Output directory
-│   ├── edm_figure1/            # EDM Figure 1 results
-│   └── denoiser_comparison/    # Comparison results
+├── results/                     # Output directory for comparison results
 │
-├── generate_edm_figure1.py     # Reproduce EDM Figure 1
-├── compare_denoisers.py        # Compare all denoising methods
+├── compare_denoisers.py        # Main script to compare all denoising methods
 ├── requirements.txt            # Dependencies
 └── README.md                   # This file
 ```
-
-See [`PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md) for detailed architecture documentation.
 
 ## 🚀 Quick Start
 
@@ -87,27 +57,9 @@ cd image-denoising-methods
 
 # Install dependencies
 pip install -r requirements.txt
-
-# Note: EDM dependencies (dnnlib, torch_utils) are included in edm_denoiser/edm/
-# No additional installation needed for pretrained models
 ```
 
-### Generate Figure 1 from EDM Paper
-
-```bash
-# Generate Figure 1 with ideal denoiser only
-python generate_edm_figure1.py
-```
-
-This will:
-1. Download CIFAR-10 dataset (if needed)
-2. Generate noisy images with σ = [0, 0.2, 0.5, 1, 2, 3, 5, 7, 10, 20, 50]
-3. Denoise using the ideal denoiser
-4. Save results to `./results/edm_figure1/` directory
-
-**Expected runtime:** ~5-10 minutes on CPU, ~2-3 minutes on GPU
-
-### Compare All Denoising Methods
+### Run Comparison
 
 ```bash
 # Compare all three denoising methods side-by-side
@@ -115,312 +67,67 @@ python compare_denoisers.py
 ```
 
 This will:
-1. Load pretrained EDM model (downloads ~300MB on first run)
-2. Generate noisy images at multiple noise levels
-3. Denoise using ideal denoiser, EDM neural network, and gradient ascent
-4. Create comparison visualizations showing:
-   - Row 1: Noisy images
-   - Row 2: Ideal denoiser results (closed-form solution)
-   - Row 3: EDM denoiser results (one-step neural network)
-   - Row 4: Gradient ascent denoiser (iterative optimization)
-5. Save results to `./results/denoiser_comparison/` directory
+1. Download CIFAR-10 dataset (if needed)
+2. Load pretrained EDM model (downloads ~226MB on first run)
+3. Generate noisy images at multiple noise levels
+4. Denoise using all three methods
+5. Create comparison visualizations
+6. Save results to `./results/` directory
 
 **Expected runtime:** ~30-40 minutes on CPU, ~8-10 minutes on GPU
 
-### Use as a Library
-
-```python
-# Import denoising methods
-from ideal_denoiser import ideal_denoiser
-from edm_denoiser import load_pretrained_edm, edm_denoise
-
-# Import utilities
-from utils.noise_utils import add_gaussian_noise
-from utils.image_utils import load_cifar10_dataset
-
-# Load data
-train_imgs, test_imgs = load_cifar10_dataset(root="./data")
-
-# Add noise
-noisy = add_gaussian_noise(test_imgs[0:1], sigma=2.0)
-
-# Denoise with ideal denoiser
-denoised_ideal = ideal_denoiser(noisy, sigma=2.0, x_all=train_imgs)
-
-# Denoise with EDM model
-model, _ = load_pretrained_edm('cifar10-uncond')
-denoised_edm = edm_denoise(model, noisy, sigma=2.0)
-```
-
-## 📊 Results
-
-### EDM Figure 1 (`generate_edm_figure1.py`)
-
-Output directory: `./results/edm_figure1/`
-
-| File | Description |
-|------|-------------|
-| `figure1_combined_train.png` | Combined visualization for training images |
-| `figure1_combined_test.png` | Combined visualization for test images |
-
-Each figure shows:
-- **Top row:** Noisy images with different σ values
-- **Bottom row:** Ideal denoiser results
-- **Columns:** Different noise levels (σ = 0 to 50)
-
-### Denoiser Comparison (`compare_denoisers.py`)
-
-Output directory: `./results/denoiser_comparison/`
-
-| File | Description |
-|------|-------------|
-| `comparison_train.png` | Comparison for 3 training images |
-| `comparison_test.png` | Comparison for 3 test images |
+**Output files:**
+- `comparison_train.png` - Comparison for training images
+- `comparison_test.png` - Comparison for test images
 
 Each figure shows:
 - **Row 1:** Noisy images at different noise levels
 - **Row 2:** Ideal denoiser results (closed-form solution)
 - **Row 3:** EDM denoiser results (one-step neural network)
 - **Row 4:** Gradient ascent denoiser (iterative optimization, 10 steps)
-- **Columns:** Different noise levels (σ = 0 to 50)
 
-## 💡 Usage Examples
+## 📊 Results
 
-### Example 1: Basic Ideal Denoiser
+### Training Set Comparison
 
-```python
-from ideal_denoiser import ideal_denoiser
-from utils.noise_utils import add_gaussian_noise
-from utils.image_utils import load_cifar10_dataset
+<img src="results/comparison_train.png" width="40%">
 
-# Load data
-train_images, test_images = load_cifar10_dataset(root="./data")
+### Test Set Comparison
 
-# Add noise and denoise
-sigma = 2.0
-noisy_img = add_gaussian_noise(test_images[0:1], sigma)
-denoised_img = ideal_denoiser(noisy_img, sigma, train_images)
-```
+<img src="results/comparison_test.png" width="40%">
 
-### Example 2: EDM Pretrained Model
-
-```python
-from edm_denoiser import load_pretrained_edm, edm_denoise
-from utils.noise_utils import add_gaussian_noise
-
-# Load pretrained model
-model, config = load_pretrained_edm('cifar10-uncond')
-
-# Denoise
-noisy_img = add_gaussian_noise(test_images[0:1], sigma=3.0)
-denoised_img = edm_denoise(model, noisy_img, sigma=3.0)
-```
-
-### Example 3: Gradient Ascent Denoising
-
-```python
-from edm_denoiser import load_pretrained_edm, gradient_ascent_denoise
-
-model, _ = load_pretrained_edm('cifar10-uncond')
-
-# Basic usage (uses float64 by default for best results)
-denoised = gradient_ascent_denoise(
-    model, noisy_img, sigma=3.0, num_steps=10, lr=1.0
-)
-
-# With trajectory tracking
-denoised, trajectory = gradient_ascent_denoise(
-    model, noisy_img, sigma=3.0, num_steps=10, lr=1.0, 
-    return_trajectory=True, use_float64=True
-)
-```
-
-**Note:** The gradient ascent denoiser uses `float64` (double precision) by default for better numerical stability and convergence. This achieves ~90% noise reduction compared to ~5% with `float32`. See [`GRADIENT_ASCENT_FIX_SUMMARY.md`](GRADIENT_ASCENT_FIX_SUMMARY.md) for details.
-
-**Quick test:**
-```bash
-python example_gradient_ascent.py  # Simple example
-python test_gradient_ascent_fix.py  # Comprehensive test
-```
-
-See [`compare_denoisers.py`](compare_denoisers.py) for a comprehensive comparison example.
-
-## 🧪 Testing
-
-Verify your installation:
-
-```bash
-# Test imports
-python -c "from ideal_denoiser import ideal_denoiser; print('✓ OK')"
-python -c "from edm_denoiser import load_edm_model; print('✓ OK')"
-python -c "from utils.noise_utils import add_gaussian_noise; print('✓ OK')"
-
-# Generate Figure 1 (ideal denoiser only)
-python generate_edm_figure1.py
-
-# Full comparison test (ideal + EDM denoiser)
-python compare_denoisers.py
-
-# Test gradient ascent denoising
-python example_gradient_ascent.py          # Simple example
-python test_gradient_ascent_fix.py         # Comprehensive test
-```
-
-## 📝 Recent Updates
-
-### Gradient Ascent Denoising Fix (Dec 2025)
-
-**Issue:** The `gradient_ascent_denoise()` function was not effectively denoising images (~5% noise reduction).
-
-**Root Cause:** Insufficient numerical precision using `float32` caused gradient computation errors to accumulate over iterations.
-
-**Solution:** 
-- Now uses `float64` (double precision) by default
-- Simplified sigma handling for cleaner code
-- Added `use_float64` parameter for configurability
-
-**Results:**
-- ✅ **89.91% noise reduction** (vs ~5% before)
-- ✅ Stable convergence over iterations
-- ✅ Backward compatible with existing code
-
-**Documentation:**
-- [`GRADIENT_ASCENT_FIX_SUMMARY.md`](GRADIENT_ASCENT_FIX_SUMMARY.md) - Detailed technical explanation
-- [`CODE_CHANGES_COMPARISON.md`](CODE_CHANGES_COMPARISON.md) - Side-by-side code comparison
-- [`example_gradient_ascent.py`](example_gradient_ascent.py) - Simple usage example
-- [`test_gradient_ascent_fix.py`](test_gradient_ascent_fix.py) - Comprehensive test suite
-
-## 🔧 Adding New Denoising Methods
-
-The modular architecture makes it easy to add new methods. You can create a new top-level package or add to existing ones:
-
-### Option 1: Create a new top-level package
-
-```
-my_denoiser/
-├── __init__.py
-└── core.py
-```
-
-```python
-# my_denoiser/core.py
-"""
-My Custom Denoiser Implementation
-"""
-
-import torch
-
-def my_denoise(noisy_images, sigma, **kwargs):
-    """
-    Denoise images using my custom method.
-    
-    Parameters:
-    -----------
-    noisy_images : torch.Tensor
-        Noisy images of shape (batch_size, C, H, W)
-    sigma : float
-        Noise level
-        
-    Returns:
-    --------
-    denoised : torch.Tensor
-        Denoised images
-    """
-    # Your implementation here
-    denoised = your_algorithm(noisy_images, sigma)
-    return denoised
-```
-
-```python
-# my_denoiser/__init__.py
-from .core import my_denoise
-__all__ = ['my_denoise']
-```
-
-### Usage
-
-```python
-from my_denoiser import my_denoise
-from utils.noise_utils import add_gaussian_noise
-
-noisy = add_gaussian_noise(images, sigma=2.0)
-denoised = my_denoise(noisy, sigma=2.0)
-```
-
-See [`PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md) for more details on extending the framework.
-
-## 📝 Implementation Details
-
-### Mathematical Formula
-
-The ideal denoiser implements Equation 57 from the paper:
-
-```
-D(x; σ) = E[x' | x] where x = x' + n, n ~ N(0, σ²I)
-```
-
-### Numerical Stability
-
-The implementation uses the **log-sum-exp trick** to prevent numerical overflow:
-
-```python
-# Compute log probabilities
-log_probs = -||x - xᵢ||² / (2σ²)
-
-# Subtract max for stability
-delta = max(log_probs)
-weights = exp(log_probs - delta)
-
-# Weighted average
-D(x; σ) = Σᵢ [weights_i · xᵢ] / Σᵢ [weights_i]
-```
-
-### Computational Complexity
-
-- **Time complexity:** O(N × B × C × H × W)
-  - N: number of training images (50,000 for CIFAR-10)
-  - B: batch size
-  - C × H × W: image dimensions (3 × 32 × 32 for CIFAR-10)
-
-- **Memory complexity:** O(N × C × H × W)
-  - Stores entire training set in memory
-
-**Note:** This approach is only feasible for small datasets like CIFAR-10. For larger datasets (e.g., ImageNet), the ideal denoiser becomes computationally intractable.
+The comparison visualizations show how each denoising method performs across different noise levels (σ = 0, 0.2, 0.5, 1, 2, 3, 5). The ideal denoiser represents the theoretical upper bound, while EDM and gradient ascent denoisers show practical learned approaches.
 
 ## 🔧 Configuration
 
-You can customize the generation by modifying `generate_edm_figure1.py`:
+You can customize the comparison by modifying the configuration in `compare_denoisers.py`:
 
 ```python
-# In main() function:
-sigma_values = [0, 0.2, 0.5, 1, 2, 3, 5, 7, 10, 20, 50]  # Noise levels
-test_indices = [20, 21]                                    # Test image indices
-save_dir = "./results"                                     # Output directory
+config = {
+    'data_root': "./data",
+    'save_dir': "./results",
+    'sigma_values': [0, 0.2, 0.5, 1, 2, 3, 5],
+    'max_samples_for_selection': 10,
+    'train_selection_indices': [2, 3, 4],
+    'test_selection_indices': [2, 3, 4],
+    'ideal_denoiser_subset_size': 1000,
+    'grad_ascent_steps': 10,
+    'grad_ascent_lr': 1.0
+}
 ```
 
-## 🎓 Background
+## 📚 References
 
-### What is the Ideal Denoiser?
+### Ideal Denoiser
+- **Source:** [ideal-denoiser](https://github.com/mehdeh/ideal-denoiser) repository
+- **Based on:** Equation 57 from EDM paper
+- **License:** Free to use without restrictions
 
-The ideal denoiser is a **theoretical upper bound** on denoising performance. It assumes:
-1. Access to the entire training distribution
-2. Perfect knowledge of the noise level σ
-3. Ability to compute exact expectations
-
-In practice, neural networks trained as denoisers approximate this ideal denoiser.
-
-## 📚 Related Files
-
-- **`README_FIGURE1.md`**: Detailed documentation for Figure 1 generation
-- **`edm_denoiser_gradient.py`**: Related work on EDM denoiser gradients
-- **Jupyter notebooks**: Interactive exploration of the concepts
-
-## 🤝 Acknowledgments
-
-This implementation is based on:
-- Original EDM paper by Karras et al. (NeurIPS 2022)
-- Equation 57 from Appendix B.3 of the paper
-- Discussions in [EDM GitHub Issue #26](https://github.com/NVlabs/edm/issues/26)
+### EDM (Elucidating the Design Space of Diffusion-Based Generative Models)
+- **Paper:** [arXiv:2206.00364](https://arxiv.org/abs/2206.00364)
+- **Authors:** Tero Karras, Miika Aittala, Timo Aila, Samuli Laine
+- **Conference:** NeurIPS 2022
+- **Official Repository:** [NVlabs/edm](https://github.com/NVlabs/edm)
 
 ## 📖 Citation
 
@@ -437,44 +144,20 @@ If you use this code, please cite the original EDM paper:
 
 ## 📄 License
 
-This project contains code from multiple sources with different licenses:
-
 ### Main Project Code
-The core implementation (ideal denoiser, utilities, scripts) is provided without restrictions and can be freely used, modified, and distributed.
+The comparison framework and utilities are provided freely without restrictions.
 
-### EDM Dependencies (`edm_denoiser/edm/`)
-The `edm_denoiser/edm/` directory contains code from the [NVlabs/edm](https://github.com/NVlabs/edm) repository:
+### EDM Components (`edm_denoiser/edm/`)
+The EDM components in `edm_denoiser/edm/` directory are from [NVlabs/edm](https://github.com/NVlabs/edm):
 
-- **License**: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)
-- **Copyright**: © 2022, NVIDIA CORPORATION & AFFILIATES
-- **Components**: `dnnlib/` and `torch_utils/` modules
-- **Source**: https://github.com/NVlabs/edm
-- **Paper**: [Elucidating the Design Space of Diffusion-Based Generative Models](https://arxiv.org/abs/2206.00364)
+- **License:** Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)
+- **Copyright:** © 2022, NVIDIA CORPORATION & AFFILIATES
+- **Usage:** Free for non-commercial research and educational purposes
 
-**License Summary:**
-- ✅ Free to use for non-commercial research and educational purposes
-- ✅ Must provide attribution to the original authors
-- ✅ Can modify and distribute under the same license
-- ❌ Cannot be used for commercial purposes without permission
-- ❌ No warranties provided
+For full license details, see `edm_denoiser/edm/LICENSE.txt` or visit http://creativecommons.org/licenses/by-nc-sa/4.0/
 
-**Attribution:**
-```bibtex
-@inproceedings{Karras2022edm,
-  author    = {Tero Karras and Miika Aittala and Timo Aila and Samuli Laine},
-  title     = {Elucidating the Design Space of Diffusion-Based Generative Models},
-  booktitle = {Proc. NeurIPS},
-  year      = {2022}
-}
-```
-
-For full license details, see:
-- `edm_denoiser/edm/LICENSE.txt` - Full license text
-- `edm_denoiser/edm/NOTICE.txt` - Attribution and citation information
-- http://creativecommons.org/licenses/by-nc-sa/4.0/
-
-### Pretrained Models
-EDM pretrained models are also licensed under CC BY-NC-SA 4.0 and are downloaded from the official NVlabs repository.
+### Ideal Denoiser
+The ideal denoiser module (`ideal_denoiser/ideal_denoiser.py`) is from the [ideal-denoiser](https://github.com/mehdeh/ideal-denoiser) repository and is provided freely without license restrictions.
 
 ## 🐛 Issues & Contributions
 
@@ -482,5 +165,4 @@ If you find any issues or have suggestions for improvements, please feel free to
 
 ---
 
-**Note:** This is an independent implementation based on the mathematical formulas in the paper. The original EDM repository does not include code for generating Figure 1.
-
+**Note:** This framework focuses on visual comparison of different denoising methods. For detailed implementation of the ideal denoiser, see the [ideal-denoiser](https://github.com/mehdeh/ideal-denoiser) repository. For the full EDM implementation, see the [official EDM repository](https://github.com/NVlabs/edm).

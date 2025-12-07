@@ -27,7 +27,7 @@ from tqdm import tqdm
 import os
 
 # Import from modular structure
-from ideal_denoiser import ideal_denoiser
+from ideal_denoiser.ideal_denoiser import ideal_denoiser
 from edm_denoiser import load_pretrained_edm, edm_denoise, gradient_ascent_denoise
 from utils.noise_utils import add_gaussian_noise
 from utils.image_utils import load_cifar10_subset, normalize_for_display
@@ -334,7 +334,7 @@ def main():
     # Configuration
     config = {
         'data_root': "./data",
-        'save_dir': "./results/denoiser_comparison",
+        'save_dir': "./results",
         'sigma_values': [0, 0.2, 0.5, 1, 2, 3, 5],#7, 10, 20, 50],
         'max_samples_for_selection': 10,
         'train_selection_indices': [2, 3, 4],
