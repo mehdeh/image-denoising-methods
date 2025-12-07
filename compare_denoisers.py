@@ -81,7 +81,7 @@ def parse_arguments():
         '--sigma-list',
         type=float,
         nargs='+',
-        default=[0, 0.2, 0.5, 1, 2, 3, 5],
+        default=[0, 0.2, 0.5, 1, 2, 3, 5, 7, 10, 15],
         help='List of sigma (noise level) values to test'
     )
     
@@ -319,9 +319,9 @@ def generate_denoiser_comparison(
     
     create_comparison_figure(
         *grid_list,
-        sigma_values,
-        save_path,
-        num_sigmas,
+        sigma_values=sigma_values,
+        save_path=save_path,
+        num_sigmas=num_sigmas,
         denoiser_names=enabled_denoisers
     )
     
