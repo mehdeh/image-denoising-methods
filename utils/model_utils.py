@@ -8,6 +8,7 @@ and managing model checkpoints.
 import os
 import urllib.request
 from tqdm import tqdm
+import torch
 
 
 class DownloadProgressBar(tqdm):
@@ -93,4 +94,52 @@ def ensure_model_downloaded(model_path: str, url: str) -> bool:
     except Exception as e:
         print(f"✗ Failed to download model: {e}")
         return False
+
+
+def load_edm_model(device: str):
+    """
+    Load pretrained EDM model with error handling.
+    
+    Parameters:
+    -----------
+    device : str
+        Device to load model on
+        
+    Returns:
+    --------
+    tuple : (model, config) or (None, None) if loading fails
+    
+    Examples:
+    ---------
+    >>> from utils.model_utils import load_edm_model
+    >>> 
+    >>> model, config = load_edm_model('cuda')
+    >>> if model is not None:
+    ...     print(f"Model loaded: {config['architecture']}")
+    """
+    from edm_denoiser import load_pretrained_edm
+    
+    print("\n" + "="*80)
+    print("Loading pretrained EDM model...")
+    print("="*80)
+    
+    try:
+        model, config = load_pretrained_edm('cifar10-uncond', device=device)
+        print(f"✓ EDM model loaded successfully")
+        print(f"  Architecture: {config['architecture']}")
+        print(f"  Resolution: {config['resolution']}x{config['resolution']}")
+        print(f"  Conditional: {config['conditional']}")
+        return model, config
+    except ModuleNotFoundError as e:
+        print(f"✗ Failed to load EDM model: {e}")
+        print("\nThe EDM pretrained models require the EDM codebase to be installed.")
+        print("\nPlease install EDM dependencies:")
+        print("  pip install git+https://github.com/NVlabs/edm.git")
+        print("\nNote: The model file will be downloaded automatically (~226MB)")
+        print("      if not already present in ./pretrain_models/")
+        return None, None
+    except Exception as e:
+        print(f"✗ Failed to load EDM model: {e}")
+        print("\nPlease ensure you have the required dependencies.")
+        return None, None
 

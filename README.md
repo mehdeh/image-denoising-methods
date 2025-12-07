@@ -33,9 +33,9 @@ image-denoising-methods/
 │
 ├── utils/                       # Common utilities
 │   ├── __init__.py
-│   ├── noise_utils.py          # Noise generation
-│   ├── image_utils.py          # Data loading and processing
-│   ├── model_utils.py          # Model download utilities
+│   ├── core.py                 # Core utilities (noise, data loading, normalization)
+│   ├── processing.py           # Image processing pipelines
+│   ├── model_utils.py          # Model download and loading utilities
 │   └── visualization.py        # Plotting and visualization
 │
 ├── data/                        # Dataset storage (auto-downloaded)
