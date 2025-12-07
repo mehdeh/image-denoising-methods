@@ -22,7 +22,7 @@ image-denoising-methods/
 ├── edm_denoiser/                # EDM neural network denoiser package
 │   ├── __init__.py             # Package exports
 │   ├── core.py                 # Main denoising function
-│   ├── model_loader.py         # Model loading and downloading
+│   ├── model_loader.py         # Model loading, downloading, and management
 │   ├── score.py                # Score function and gradient ascent
 │   ├── utils.py                # Helper utilities
 │   └── edm/                    # EDM dependencies (CC BY-NC-SA 4.0)
@@ -35,7 +35,6 @@ image-denoising-methods/
 │   ├── __init__.py
 │   ├── core.py                 # Core utilities (noise, data loading, normalization)
 │   ├── processing.py           # Image processing pipelines
-│   ├── model_utils.py          # Model download and loading utilities
 │   └── visualization.py        # Plotting and visualization
 │
 ├── data/                        # Dataset storage (auto-downloaded)

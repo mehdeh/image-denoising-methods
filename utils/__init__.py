@@ -5,7 +5,6 @@ This package contains common utilities used across different denoising methods:
 - core: Core utilities (noise generation, image loading, normalization)
 - visualization: Visualization and plotting utilities
 - processing: Image processing pipelines for denoising experiments
-- model_utils: Pretrained model downloading and management utilities
 """
 
 from .core import (
@@ -16,11 +15,6 @@ from .core import (
 )
 from .visualization import create_labeled_figure, create_comparison_figure
 from .processing import process_images_at_sigma, generate_denoiser_comparison
-from .model_utils import (
-    download_file,
-    ensure_model_downloaded,
-    load_edm_model
-)
 
 __all__ = [
     # Core utilities
@@ -35,10 +29,5 @@ __all__ = [
     
     # Processing utilities
     'process_images_at_sigma',
-    'generate_denoiser_comparison',
-    
-    # Model utilities
-    'download_file',
-    'ensure_model_downloaded',
-    'load_edm_model'
+    'generate_denoiser_comparison'
 ]

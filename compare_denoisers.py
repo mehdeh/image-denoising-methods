@@ -33,8 +33,8 @@ from datetime import datetime
 
 # Import from modular structure
 from utils.core import load_cifar10_subset
-from utils.model_utils import load_edm_model
 from utils.processing import generate_denoiser_comparison
+from edm_denoiser.model_loader import load_edm_model_wrapper
 
 
 def parse_arguments():
@@ -163,7 +163,7 @@ def main():
     
     # Load EDM model (required for EDM and gradient ascent denoisers)
     if 'edm' in args.denoisers or 'grad-ascent' in args.denoisers:
-        edm_model, edm_config = load_edm_model(device)
+        edm_model, edm_config = load_edm_model_wrapper(device)
         if edm_model is None:
             print("\n✗ Cannot proceed without EDM model for EDM/gradient ascent denoisers")
             return

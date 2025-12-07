@@ -2,20 +2,105 @@
 EDM model loading utilities.
 
 This module handles downloading and loading pretrained EDM models.
+Includes download utilities and model management functions.
 """
 
 import torch
 import pickle
 import os
+import urllib.request
 from typing import Optional, Union, Tuple
+from tqdm import tqdm
 
-# Import model download utility
-try:
-    from utils.model_utils import ensure_model_downloaded
-    HAS_MODEL_UTILS = True
-except ImportError:
-    HAS_MODEL_UTILS = False
 
+# ========== Download Utilities ==========
+
+class DownloadProgressBar(tqdm):
+    """Progress bar for urllib downloads."""
+    
+    def update_to(self, blocks=1, block_size=1, total_size=None):
+        """Update progress bar for urllib.request.urlretrieve."""
+        if total_size is not None:
+            self.total = total_size
+        self.update(blocks * block_size - self.n)
+
+
+def download_file(url: str, destination: str) -> None:
+    """
+    Download a file from URL with progress bar.
+    
+    Parameters:
+    -----------
+    url : str
+        URL to download from
+    destination : str
+        Local path to save the downloaded file
+        
+    Examples:
+    ---------
+    >>> from edm_denoiser.model_loader import download_file
+    >>> 
+    >>> url = "https://example.com/model.pkl"
+    >>> dest = "./models/model.pkl"
+    >>> download_file(url, dest)
+    """
+    # Create directory if it doesn't exist
+    os.makedirs(os.path.dirname(destination), exist_ok=True)
+    
+    print(f"Downloading from {url}")
+    print(f"Saving to {destination}")
+    
+    with DownloadProgressBar(unit='B', unit_scale=True, miniters=1, desc="Download") as progress_bar:
+        urllib.request.urlretrieve(
+            url,
+            destination,
+            reporthook=progress_bar.update_to
+        )
+    
+    print(f"✓ Download completed: {destination}")
+
+
+def ensure_model_downloaded(model_path: str, url: str) -> bool:
+    """
+    Ensure a model file exists, downloading if necessary.
+    
+    Parameters:
+    -----------
+    model_path : str
+        Local path where model should exist
+    url : str
+        URL to download from if model doesn't exist
+        
+    Returns:
+    --------
+    success : bool
+        True if model exists or was successfully downloaded
+        
+    Examples:
+    ---------
+    >>> from edm_denoiser.model_loader import ensure_model_downloaded
+    >>> 
+    >>> model_path = "./pretrain_models/edm-cifar10-32x32-uncond-ve.pkl"
+    >>> url = "https://nvlabs-fi-cdn.nvidia.com/edm/pretrained/edm-cifar10-32x32-uncond-ve.pkl"
+    >>> 
+    >>> if ensure_model_downloaded(model_path, url):
+    >>>     print("Model ready to use")
+    """
+    if os.path.exists(model_path):
+        print(f"✓ Model found at: {model_path}")
+        return True
+    
+    print(f"Model not found at: {model_path}")
+    
+    try:
+        download_file(url, model_path)
+        return True
+    except Exception as e:
+        print(f"✗ Failed to download model: {e}")
+        return False
+
+
+# ========== Model Loading Functions ==========
 
 def load_edm_model(
     model_path: str,
@@ -58,10 +143,6 @@ def load_edm_model(
     >>> noisy_img = torch.randn(1, 3, 32, 32).to(device)
     >>> sigma = torch.tensor([2.0]).to(device)
     >>> denoised = model(noisy_img, sigma, class_labels=None)
-    
-    Notes:
-    ------
-    Can use dnnlib from edm_denoiser/edm/ for URL downloads if model_utils is not available.
     """
     # Set default device
     if device is None:
@@ -71,32 +152,9 @@ def load_edm_model(
     
     # Check if the model file already exists, download if needed
     if not os.path.exists(model_path) and url is not None:
-        # Try using the model_utils download first
-        if HAS_MODEL_UTILS:
-            print(f"Model not found at {model_path}. Downloading...")
-            if not ensure_model_downloaded(model_path, url):
-                raise RuntimeError(f"Failed to download model from {url}")
-        else:
-            # Fallback to dnnlib if available
-            print(f"Model not found at {model_path}. Downloading from {url}...")
-            try:
-                import dnnlib
-                with dnnlib.util.open_url(url) as f:
-                    net = pickle.load(f)['ema'].to(device)
-                
-                # Save the downloaded model
-                os.makedirs(os.path.dirname(model_path), exist_ok=True)
-                with open(model_path, "wb") as f:
-                    pickle.dump({'ema': net}, f)
-                print(f"Model downloaded and saved at {model_path}")
-                net.eval()
-                return net
-            except ImportError:
-                raise ImportError(
-                    "Neither model_utils nor dnnlib is available. "
-                    "Please ensure utils.model_utils is accessible or "
-                    "dnnlib is available in edm_denoiser/edm/"
-                )
+        print(f"Model not found at {model_path}. Downloading...")
+        if not ensure_model_downloaded(model_path, url):
+            raise RuntimeError(f"Failed to download model from {url}")
     
     # Load the model from disk
     if os.path.exists(model_path):
@@ -242,3 +300,51 @@ def load_pretrained_edm(
     
     return model, config
 
+
+def load_edm_model_wrapper(device: str):
+    """
+    Load pretrained EDM model with error handling.
+    
+    This is a convenience wrapper function that provides user-friendly
+    error messages and configuration display.
+    
+    Parameters:
+    -----------
+    device : str
+        Device to load model on
+        
+    Returns:
+    --------
+    tuple : (model, config) or (None, None) if loading fails
+    
+    Examples:
+    ---------
+    >>> from edm_denoiser.model_loader import load_edm_model_wrapper
+    >>> 
+    >>> model, config = load_edm_model_wrapper('cuda')
+    >>> if model is not None:
+    ...     print(f"Model loaded: {config['architecture']}")
+    """
+    print("\n" + "="*80)
+    print("Loading pretrained EDM model...")
+    print("="*80)
+    
+    try:
+        model, config = load_pretrained_edm('cifar10-uncond', device=device)
+        print(f"✓ EDM model loaded successfully")
+        print(f"  Architecture: {config['architecture']}")
+        print(f"  Resolution: {config['resolution']}x{config['resolution']}")
+        print(f"  Conditional: {config['conditional']}")
+        return model, config
+    except ModuleNotFoundError as e:
+        print(f"✗ Failed to load EDM model: {e}")
+        print("\nThe EDM pretrained models require the EDM codebase to be installed.")
+        print("\nPlease install EDM dependencies:")
+        print("  pip install git+https://github.com/NVlabs/edm.git")
+        print("\nNote: The model file will be downloaded automatically (~226MB)")
+        print("      if not already present in ./pretrain_models/")
+        return None, None
+    except Exception as e:
+        print(f"✗ Failed to load EDM model: {e}")
+        print("\nPlease ensure you have the required dependencies.")
+        return None, None
