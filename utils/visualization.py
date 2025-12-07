@@ -30,6 +30,18 @@ def create_labeled_figure(noisy_grid, denoised_grid, sigma_values, save_path, nu
         Full path to save the figure
     num_sigmas : int
         Number of sigma values (columns in the grid)
+        
+    Examples:
+    ---------
+    >>> import torch
+    >>> from torchvision.utils import make_grid
+    >>> from utils.visualization import create_labeled_figure
+    >>> 
+    >>> # Create dummy grids
+    >>> noisy = make_grid(torch.randn(9, 3, 32, 32), nrow=3)
+    >>> denoised = make_grid(torch.randn(9, 3, 32, 32), nrow=3)
+    >>> 
+    >>> create_labeled_figure(noisy, denoised, [0, 1, 2], "output.png", 3)
     """
     fig, axes = plt.subplots(2, 1, figsize=(20, 8))
     
