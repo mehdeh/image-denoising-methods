@@ -6,7 +6,7 @@ This script compares three denoising methods on CIFAR-10 images:
 2. EDM pretrained denoiser (learned neural network - one-step)
 3. Gradient ascent denoiser (iterative optimization using score function)
 
-For 3 train and 3 test images with various noise levels, it generates visualizations
+For selected train and test images with various noise levels, it generates visualizations
 showing:
 - Row 1: Noisy images at different sigma levels
 - Row 2: Results from ideal denoiser
@@ -18,6 +18,11 @@ This allows direct visual comparison of theoretical vs. learned vs. iterative de
 Reference:
     Karras et al., "Elucidating the Design Space of Diffusion-Based Generative Models", NeurIPS 2022
     Paper: https://arxiv.org/abs/2206.00364
+
+Usage:
+    python compare_denoisers.py --num-images 3 --train-size 1000
+    python compare_denoisers.py --sigma-list 0 0.5 1 2 5 10 --device cuda
+    python compare_denoisers.py --grad-ascent-steps 20 --grad-ascent-lr 0.5
 """
 
 import torch
@@ -25,6 +30,8 @@ from torchvision.utils import make_grid
 import numpy as np
 from tqdm import tqdm
 import os
+import argparse
+from datetime import datetime
 
 # Import from modular structure
 from ideal_denoiser.ideal_denoiser import ideal_denoiser
@@ -34,17 +41,105 @@ from utils.image_utils import load_cifar10_subset, normalize_for_display
 from utils.visualization import create_comparison_figure
 
 
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description='Compare multiple denoising methods on CIFAR-10 images',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    
+    # Data parameters
+    parser.add_argument(
+        '--data-root',
+        type=str,
+        default='./data',
+        help='Root directory for CIFAR-10 data'
+    )
+    parser.add_argument(
+        '--save-dir',
+        type=str,
+        default='./results',
+        help='Directory to save output images'
+    )
+    
+    # Image selection parameters
+    parser.add_argument(
+        '--num-images',
+        type=int,
+        default=3,
+        help='Number of images to denoise from each dataset (train/test)'
+    )
+    
+    # Denoiser parameters
+    parser.add_argument(
+        '--train-size',
+        type=int,
+        default=1000,
+        help='Number of training images to use for ideal denoiser reference'
+    )
+    parser.add_argument(
+        '--sigma-list',
+        type=float,
+        nargs='+',
+        default=[0, 0.2, 0.5, 1, 2, 3, 5],
+        help='List of sigma (noise level) values to test'
+    )
+    
+    # Gradient ascent parameters
+    parser.add_argument(
+        '--grad-ascent-steps',
+        type=int,
+        default=10,
+        help='Number of gradient ascent iterations'
+    )
+    parser.add_argument(
+        '--grad-ascent-lr',
+        type=float,
+        default=1.0,
+        help='Learning rate for gradient ascent'
+    )
+    
+    # Denoiser selection (all enabled by default)
+    parser.add_argument(
+        '--denoisers',
+        type=str,
+        nargs='+',
+        default=['ideal', 'edm', 'grad-ascent'],
+        choices=['ideal', 'edm', 'grad-ascent'],
+        help='Denoisers to use in comparison (by default all are enabled)'
+    )
+    
+    # Device parameters
+    parser.add_argument(
+        '--device',
+        type=str,
+        default=None,
+        help='Device to use (cpu or cuda). If not specified, auto-detect.'
+    )
+    
+    # Random seed
+    parser.add_argument(
+        '--seed',
+        type=int,
+        default=42,
+        help='Random seed for reproducibility (if not set, default is 42)'
+    )
+    
+    return parser.parse_args()
+
+
 def process_images_at_sigma(
     selected_images: torch.Tensor,
     train_images: torch.Tensor,
     edm_model: torch.nn.Module,
     sigma: float,
     device: str,
+    enabled_denoisers: list,
     grad_ascent_steps: int = 10,
-    grad_ascent_lr: float = 0.1
-) -> tuple:
+    grad_ascent_lr: float = 1.0
+) -> dict:
     """
-    Process images at a specific noise level with all denoisers.
+    Process images at a specific noise level with all enabled denoisers.
     
     Parameters:
     -----------
@@ -58,6 +153,8 @@ def process_images_at_sigma(
         Noise level
     device : str
         Device to run computations on
+    enabled_denoisers : list
+        List of enabled denoisers ('ideal', 'edm', 'grad-ascent')
     grad_ascent_steps : int
         Number of gradient ascent iterations (default: 10)
     grad_ascent_lr : float
@@ -65,50 +162,60 @@ def process_images_at_sigma(
         
     Returns:
     --------
-    tuple : (noisy, ideal_denoised, edm_denoised, grad_ascent_denoised)
-        Four tensors containing the noisy images and all denoised versions
+    dict : Dictionary containing results from each enabled denoiser
     """
+    results = {}
+    
     # Handle sigma = 0 case
     if sigma == 0:
-        return (
-            selected_images.clone(),
-            selected_images.clone(),
-            selected_images.clone(),
-            selected_images.clone()
-        )
+        results['noisy'] = selected_images.clone()
+        if 'ideal' in enabled_denoisers:
+            results['ideal'] = selected_images.clone()
+        if 'edm' in enabled_denoisers:
+            results['edm'] = selected_images.clone()
+        if 'grad-ascent' in enabled_denoisers:
+            results['grad-ascent'] = selected_images.clone()
+        return results
     
     # Add noise (in float32, matching how data is loaded)
     noisy_batch = add_gaussian_noise(selected_images, sigma)
+    results['noisy'] = noisy_batch
     
     # Denoise with ideal denoiser
-    with torch.no_grad():
-        ideal_denoised_batch = ideal_denoiser(
-            noisy_batch,
-            sigma,
-            train_images
-        )
+    if 'ideal' in enabled_denoisers:
+        with torch.no_grad():
+            ideal_denoised_batch = ideal_denoiser(
+                noisy_batch,
+                sigma,
+                train_images
+            )
+        results['ideal'] = ideal_denoised_batch
     
     # Denoise with EDM denoiser (one-step)
-    with torch.no_grad():
-        edm_denoised_batch = edm_denoise(
-            edm_model,
-            noisy_batch,
-            sigma
-        )
+    if 'edm' in enabled_denoisers:
+        with torch.no_grad():
+            edm_denoised_batch = edm_denoise(
+                edm_model,
+                noisy_batch,
+                sigma
+            )
+        results['edm'] = edm_denoised_batch
     
-    # Denoise with gradient ascent (EDM score-based, new implementation)
-    with torch.no_grad():
-        grad_ascent_denoised_batch = gradient_ascent_denoise(
-            edm_model,
-            noisy_batch,
-            sigma,
-            num_steps=grad_ascent_steps,
-            lr=grad_ascent_lr,
-            return_trajectory=False,
-            use_float64=True
-        )
+    # Denoise with gradient ascent (EDM score-based)
+    if 'grad-ascent' in enabled_denoisers:
+        with torch.no_grad():
+            grad_ascent_denoised_batch = gradient_ascent_denoise(
+                edm_model,
+                noisy_batch,
+                sigma,
+                num_steps=grad_ascent_steps,
+                lr=grad_ascent_lr,
+                return_trajectory=False,
+                use_float64=True
+            )
+        results['grad-ascent'] = grad_ascent_denoised_batch
     
-    return noisy_batch, ideal_denoised_batch, edm_denoised_batch, grad_ascent_denoised_batch
+    return results
 
 
 def generate_denoiser_comparison(
@@ -117,20 +224,19 @@ def generate_denoiser_comparison(
     edm_model: torch.nn.Module,
     sigma_values: list,
     dataset_name: str,
-    save_dir: str,
+    save_path: str,
     device: str = 'cpu',
+    enabled_denoisers: list = ['ideal', 'edm', 'grad-ascent'],
     grad_ascent_steps: int = 10,
     grad_ascent_lr: float = 1.0
-) -> tuple:
+) -> dict:
     """
-    Generate comparison of ideal, EDM, and gradient ascent denoisers.
+    Generate comparison of enabled denoising methods.
     
     This function processes selected images by:
     1. Adding Gaussian noise at various sigma levels
-    2. Denoising with ideal denoiser (closed-form solution)
-    3. Denoising with EDM pretrained model (one-step)
-    4. Denoising with gradient ascent (iterative)
-    5. Creating comparative visualizations
+    2. Denoising with enabled methods
+    3. Creating comparative visualizations
     
     Parameters:
     -----------
@@ -146,10 +252,12 @@ def generate_denoiser_comparison(
         List of noise levels to test
     dataset_name : str
         Name of the dataset ('train' or 'test') for naming output file
-    save_dir : str
-        Directory to save output images
+    save_path : str
+        Full path to save output image
     device : str
         Device to run computations on ('cpu' or 'cuda')
+    enabled_denoisers : list
+        List of enabled denoisers (default: ['ideal', 'edm', 'grad-ascent'])
     grad_ascent_steps : int
         Number of gradient ascent iterations (default: 10)
     grad_ascent_lr : float
@@ -157,10 +265,9 @@ def generate_denoiser_comparison(
         
     Returns:
     --------
-    tuple : (noisy_grid, ideal_grid, edm_grid, grad_ascent_grid)
-        Four grids containing noisy, ideal, EDM, and gradient ascent denoised images
+    dict : Dictionary containing grids for each denoiser
     """
-    os.makedirs(save_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
     
     # Move to device
     train_images = train_images.to(device)
@@ -171,69 +278,56 @@ def generate_denoiser_comparison(
     
     print(f"\nGenerating comparison with {num_images} images and {num_sigmas} sigma values...")
     print(f"Sigma values: {sigma_values}")
+    print(f"Enabled denoisers: {enabled_denoisers}")
     
     # Storage for results
-    noisy_images_all = []
-    ideal_denoised_all = []
-    edm_denoised_all = []
-    grad_ascent_denoised_all = []
+    all_results = {denoiser: [] for denoiser in ['noisy'] + enabled_denoisers}
     
     # Process each sigma value with batch of all images
     for sigma in tqdm(sigma_values, desc="Processing sigma values"):
-        noisy, ideal_denoised, edm_denoised, grad_ascent_denoised = process_images_at_sigma(
+        sigma_results = process_images_at_sigma(
             selected_images,
             train_images,
             edm_model,
             sigma,
             device,
+            enabled_denoisers,
             grad_ascent_steps,
             grad_ascent_lr
         )
         
-        noisy_images_all.append(noisy)
-        ideal_denoised_all.append(ideal_denoised)
-        edm_denoised_all.append(edm_denoised)
-        grad_ascent_denoised_all.append(grad_ascent_denoised)
+        for key, value in sigma_results.items():
+            all_results[key].append(value)
     
     # Stack and organize images: transpose from (num_sigmas, num_images, C, H, W)
     # to (num_images, num_sigmas, C, H, W) then flatten to grid format
-    noisy_stack = torch.stack(noisy_images_all, dim=0).transpose(0, 1)
-    ideal_stack = torch.stack(ideal_denoised_all, dim=0).transpose(0, 1)
-    edm_stack = torch.stack(edm_denoised_all, dim=0).transpose(0, 1)
-    grad_ascent_stack = torch.stack(grad_ascent_denoised_all, dim=0).transpose(0, 1)
-    
-    # Flatten to grid format
-    noisy_grid = noisy_stack.reshape(-1, *noisy_stack.shape[2:])
-    ideal_grid = ideal_stack.reshape(-1, *ideal_stack.shape[2:])
-    edm_grid = edm_stack.reshape(-1, *edm_stack.shape[2:])
-    grad_ascent_grid = grad_ascent_stack.reshape(-1, *grad_ascent_stack.shape[2:])
-    
-    # Normalize for display
-    noisy_display = normalize_for_display(noisy_grid)
-    ideal_display = normalize_for_display(ideal_grid)
-    edm_display = normalize_for_display(edm_grid)
-    grad_ascent_display = normalize_for_display(grad_ascent_grid)
-    
-    # Create grids
-    print("\nCreating image grids...")
-    noisy_grid_img = make_grid(noisy_display, nrow=num_sigmas, padding=2, pad_value=1.0)
-    ideal_grid_img = make_grid(ideal_display, nrow=num_sigmas, padding=2, pad_value=1.0)
-    edm_grid_img = make_grid(edm_display, nrow=num_sigmas, padding=2, pad_value=1.0)
-    grad_ascent_grid_img = make_grid(grad_ascent_display, nrow=num_sigmas, padding=2, pad_value=1.0)
+    grids = {}
+    for key, results_list in all_results.items():
+        stacked = torch.stack(results_list, dim=0).transpose(0, 1)
+        grid = stacked.reshape(-1, *stacked.shape[2:])
+        display = normalize_for_display(grid)
+        grid_img = make_grid(display, nrow=num_sigmas, padding=2, pad_value=1.0)
+        grids[key] = grid_img
     
     # Create combined visualization with labels
-    combined_path = os.path.join(save_dir, f"comparison_{dataset_name}.png")
+    print("\nCreating comparison figure...")
+    
+    # Build list of grids in order: noisy, then enabled denoisers
+    grid_list = [grids['noisy']]
+    for denoiser in enabled_denoisers:
+        grid_list.append(grids[denoiser])
+    
     create_comparison_figure(
-        noisy_grid_img,
-        ideal_grid_img,
-        edm_grid_img,
-        grad_ascent_grid_img,
+        *grid_list,
         sigma_values,
-        combined_path,
-        num_sigmas
+        save_path,
+        num_sigmas,
+        denoiser_names=enabled_denoisers
     )
     
-    return noisy_grid_img, ideal_grid_img, edm_grid_img, grad_ascent_grid_img
+    print(f"✓ Saved comparison to: {save_path}")
+    
+    return grids
 
 
 def load_edm_model(device: str):
@@ -274,140 +368,165 @@ def load_edm_model(device: str):
         return None, None
 
 
-def setup_data_subsets(data_root: str, config: dict) -> tuple:
-    """
-    Load data subsets for comparison.
-    
-    Parameters:
-    -----------
-    data_root : str
-        Root directory for CIFAR-10 data
-    config : dict
-        Configuration dictionary with selection parameters
-        
-    Returns:
-    --------
-    tuple : (train_selected, test_selected, train_images_for_denoiser)
-    """
-    print("\n" + "="*80)
-    print("Loading image subsets...")
-    print("="*80)
-    
-    # Load small subsets for selection
-    train_subset = load_cifar10_subset(
-        root=data_root,
-        normalize=True,
-        train=True,
-        max_samples=config['max_samples_for_selection']
-    )
-    test_subset = load_cifar10_subset(
-        root=data_root,
-        normalize=True,
-        train=False,
-        max_samples=config['max_samples_for_selection']
-    )
-    
-    # Select specific images
-    train_selected = train_subset[config['train_selection_indices']]
-    test_selected = test_subset[config['test_selection_indices']]
-    
-    # Load training images for ideal denoiser reference
-    print(f"\nLoading {config['ideal_denoiser_subset_size']} training images for ideal denoiser...")
-    train_images_for_denoiser = load_cifar10_subset(
-        root=data_root,
-        normalize=True,
-        train=True,
-        max_samples=config['ideal_denoiser_subset_size']
-    )
-    
-    return train_selected, test_selected, train_images_for_denoiser
-
-
 def main():
     """
-    Main function to compare ideal, EDM, and gradient ascent denoisers.
+    Main function to compare enabled denoising methods with CLI arguments.
     
     Generates comparison figures for both training and test datasets,
-    showing noisy images, ideal denoiser results, EDM denoiser results,
-    and gradient ascent denoiser results side-by-side for visual quality assessment.
+    showing noisy images and results from enabled denoisers side-by-side
+    for visual quality assessment.
     """
-    # Configuration
-    config = {
-        'data_root': "./data",
-        'save_dir': "./results",
-        'sigma_values': [0, 0.2, 0.5, 1, 2, 3, 5],#7, 10, 20, 50],
-        'max_samples_for_selection': 10,
-        'train_selection_indices': [2, 3, 4],
-        'test_selection_indices': [2, 3, 4],
-        'ideal_denoiser_subset_size': 1000,
-        'grad_ascent_steps': 10,
-        'grad_ascent_lr': 1.0
-    }
+    # Parse arguments
+    args = parse_arguments()
     
     # Device selection
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f"Using device: {device}")
+    if args.device is None:
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    else:
+        device = args.device
+    
+    print("="*80)
+    print("Denoiser Comparison Framework")
+    print("="*80)
+    print(f"\nConfiguration:")
+    print(f"  Device: {device}")
+    print(f"  Data root: {args.data_root}")
+    print(f"  Save directory: {args.save_dir}")
+    print(f"  Number of images: {args.num_images}")
+    print(f"  Training images for ideal denoiser: {args.train_size}")
+    print(f"  Sigma values: {args.sigma_list}")
+    print(f"  Gradient ascent steps: {args.grad_ascent_steps}")
+    print(f"  Gradient ascent learning rate: {args.grad_ascent_lr}")
+    print(f"  Enabled denoisers: {args.denoisers}")
+    print(f"  Random seed: {args.seed}")
     
     # Set random seed for reproducibility
-    torch.manual_seed(42)
-    np.random.seed(42)
+    if args.seed is not None:
+        torch.manual_seed(args.seed)
+        np.random.seed(args.seed)
     
-    # Load EDM model
-    edm_model, edm_config = load_edm_model(device)
-    if edm_model is None:
-        return
+    # Load EDM model (required for EDM and gradient ascent denoisers)
+    if 'edm' in args.denoisers or 'grad-ascent' in args.denoisers:
+        edm_model, edm_config = load_edm_model(device)
+        if edm_model is None:
+            print("\n✗ Cannot proceed without EDM model for EDM/gradient ascent denoisers")
+            return
+    else:
+        edm_model = None
     
     # Load data subsets
-    train_selected, test_selected, train_images_for_denoiser = setup_data_subsets(
-        config['data_root'],
-        config
-    )
-    
-    # Generate comparison for training set
     print("\n" + "="*80)
-    print("Generating Denoiser Comparison: Training Set")
+    print("Loading Data Subsets")
     print("="*80)
     
+    print("\nLoading CIFAR-10 training subset for random selection and ideal denoiser...")
+    train_subset = load_cifar10_subset(
+        root=args.data_root,
+        normalize=True,
+        train=True,
+        max_samples=args.train_size
+    )
+    print("\nLoading full CIFAR-10 test set for random selection...")
+    test_subset = load_cifar10_subset(
+        root=args.data_root,
+        normalize=True,
+        train=False,
+        max_samples=None
+    )
+    
+    # Generate separate random indices for train and test sets
+    num_train_available = len(train_subset)
+    num_test_available = len(test_subset)
+    
+    if args.num_images > num_train_available:
+        raise ValueError(
+            f"Requested num-images={args.num_images} but only {num_train_available} training samples are available."
+        )
+    if args.num_images > num_test_available:
+        raise ValueError(
+            f"Requested num-images={args.num_images} but only {num_test_available} test samples are available."
+        )
+    
+    train_indices = np.random.choice(num_train_available, size=args.num_images, replace=False)
+    test_indices = np.random.choice(num_test_available, size=args.num_images, replace=False)
+    
+    print(f"\n  Randomly selected train indices: {train_indices.tolist()}")
+    print(f"  Randomly selected test indices: {test_indices.tolist()}")
+    
+    train_selected = train_subset[train_indices]
+    test_selected = test_subset[test_indices]
+    
+    print(f"Selected {len(train_selected)} training images")
+    print(f"Selected {len(test_selected)} test images")
+    
+    # Training images for ideal denoiser reference: use the same train subset
+    train_images_for_denoiser = train_subset
+    
+    # Generate timestamp for output filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Create descriptive filename with key config parameters
+    sigma_min = min(args.sigma_list)
+    sigma_max = max(args.sigma_list)
+    denoisers_str = '-'.join(args.denoisers)
+    filename_base = f"{timestamp}_n{args.num_images}_s{sigma_min}-{sigma_max}_train{args.train_size}_{denoisers_str}"
+    
+    # Generate output for training set
+    print("\n" + "="*80)
+    print("Processing Training Set")
+    print("="*80)
+    
+    train_output_path = os.path.join(args.save_dir, f"{filename_base}_train.png")
     generate_denoiser_comparison(
         selected_images=train_selected,
         train_images=train_images_for_denoiser,
         edm_model=edm_model,
-        sigma_values=config['sigma_values'],
+        sigma_values=args.sigma_list,
         dataset_name="train",
-        save_dir=config['save_dir'],
+        save_path=train_output_path,
         device=device,
-        grad_ascent_steps=config['grad_ascent_steps'],
-        grad_ascent_lr=config['grad_ascent_lr']
+        enabled_denoisers=args.denoisers,
+        grad_ascent_steps=args.grad_ascent_steps,
+        grad_ascent_lr=args.grad_ascent_lr
     )
     
-    # Generate comparison for test set
+    # Generate output for test set
     print("\n" + "="*80)
-    print("Generating Denoiser Comparison: Test Set")
+    print("Processing Test Set")
     print("="*80)
     
+    test_output_path = os.path.join(args.save_dir, f"{filename_base}_test.png")
     generate_denoiser_comparison(
         selected_images=test_selected,
         train_images=train_images_for_denoiser,
         edm_model=edm_model,
-        sigma_values=config['sigma_values'],
+        sigma_values=args.sigma_list,
         dataset_name="test",
-        save_dir=config['save_dir'],
+        save_path=test_output_path,
         device=device,
-        grad_ascent_steps=config['grad_ascent_steps'],
-        grad_ascent_lr=config['grad_ascent_lr']
+        enabled_denoisers=args.denoisers,
+        grad_ascent_steps=args.grad_ascent_steps,
+        grad_ascent_lr=args.grad_ascent_lr
     )
     
     print("\n" + "="*80)
-    print("Comparison generation completed successfully!")
+    print("Comparison Completed Successfully!")
     print("="*80)
-    print(f"\nOutput files saved in: {config['save_dir']}/")
-    print("- comparison_train.png: Comparison for training set")
-    print("- comparison_test.png: Comparison for test set")
-    print("\nEach figure shows:")
-    print("  Row 1: Noisy images at different noise levels")
-    print("  Row 2: Ideal denoiser results (closed-form solution)")
-    print("  Row 3: EDM denoiser results (one-step neural network)")
-    print(f"  Row 4: Gradient ascent denoiser ({config['grad_ascent_steps']} steps, lr={config['grad_ascent_lr']})")
+    print(f"\nOutput files:")
+    print(f"  Training set: {train_output_path}")
+    print(f"  Test set: {test_output_path}")
+    print(f"\nEach figure shows:")
+    print(f"  Row 1: Noisy images at different noise levels")
+    enabled_row = 2
+    for denoiser in args.denoisers:
+        denoiser_name = {
+            'ideal': 'Ideal denoiser (closed-form solution)',
+            'edm': 'EDM denoiser (one-step neural network)',
+            'grad-ascent': f'Gradient ascent denoiser ({args.grad_ascent_steps} steps, lr={args.grad_ascent_lr})'
+        }[denoiser]
+        print(f"  Row {enabled_row}: {denoiser_name}")
+        enabled_row += 1
+    print()
 
 
 if __name__ == "__main__":

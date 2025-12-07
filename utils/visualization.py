@@ -67,37 +67,33 @@ def create_labeled_figure(noisy_grid, denoised_grid, sigma_values, save_path, nu
 
 
 def create_comparison_figure(
-    noisy_grid: torch.Tensor,
-    ideal_grid: torch.Tensor,
-    edm_grid: torch.Tensor,
-    grad_ascent_grid: torch.Tensor,
+    *grids: torch.Tensor,
     sigma_values: list,
     save_path: str,
-    num_sigmas: int
+    num_sigmas: int,
+    denoiser_names: list = None
 ) -> None:
     """
-    Create a 4-row comparison figure with labels for sigma values.
+    Create a multi-row comparison figure with labels for sigma values.
     
-    This function creates a publication-quality figure showing noisy images,
-    ideal denoiser results, EDM denoiser results, and gradient ascent denoiser
-    results in a grid format with labeled sigma values aligned with image columns.
+    This function creates a publication-quality figure showing noisy images
+    and results from multiple denoisers in a grid format with labeled sigma
+    values aligned with image columns.
     
     Parameters:
     -----------
-    noisy_grid : torch.Tensor
-        Grid of noisy images (C, H, W) after make_grid
-    ideal_grid : torch.Tensor
-        Grid of ideal denoiser results (C, H, W) after make_grid
-    edm_grid : torch.Tensor
-        Grid of EDM denoiser results (C, H, W) after make_grid
-    grad_ascent_grid : torch.Tensor
-        Grid of gradient ascent denoiser results (C, H, W) after make_grid
+    *grids : torch.Tensor
+        Variable number of image grids (C, H, W) after make_grid.
+        First grid should be noisy images, followed by denoiser results.
     sigma_values : list
         List of sigma values used for noise levels
     save_path : str
         Full path to save the figure
     num_sigmas : int
         Number of sigma values (columns in the grid)
+    denoiser_names : list, optional
+        List of denoiser names corresponding to grids (excluding noisy).
+        If None, uses default names ['ideal', 'edm', 'grad-ascent']
         
     Examples:
     ---------
@@ -109,19 +105,33 @@ def create_comparison_figure(
     >>> noisy = make_grid(torch.randn(9, 3, 32, 32), nrow=3)
     >>> ideal = make_grid(torch.randn(9, 3, 32, 32), nrow=3)
     >>> edm = make_grid(torch.randn(9, 3, 32, 32), nrow=3)
-    >>> grad_ascent = make_grid(torch.randn(9, 3, 32, 32), nrow=3)
     >>> 
-    >>> create_comparison_figure(noisy, ideal, edm, grad_ascent, [0, 1, 2], "comparison.png", 3)
+    >>> create_comparison_figure(noisy, ideal, edm, 
+    ...     sigma_values=[0, 1, 2], 
+    ...     save_path="comparison.png", 
+    ...     num_sigmas=3,
+    ...     denoiser_names=['ideal', 'edm'])
     """
-    fig, axes = plt.subplots(4, 1, figsize=(20, 16))
+    # Denoiser title mappings
+    denoiser_title_map = {
+        'ideal': "Ideal Denoiser Output D(x; σ) - Eq. 57 (Closed-form)",
+        'edm': "EDM Denoiser Output D(x; σ) - Pretrained Neural Network (One-step)",
+        'grad-ascent': "Gradient Ascent Denoiser - Iterative Optimization (x ← x + lr·∇log p(x; σ))"
+    }
     
-    # Convert grids to numpy
-    noisy_np = noisy_grid.permute(1, 2, 0).cpu().numpy()
-    ideal_np = ideal_grid.permute(1, 2, 0).cpu().numpy()
-    edm_np = edm_grid.permute(1, 2, 0).cpu().numpy()
-    grad_ascent_np = grad_ascent_grid.permute(1, 2, 0).cpu().numpy()
+    num_rows = len(grids)
+    fig, axes = plt.subplots(num_rows, 1, figsize=(20, 4 * num_rows))
     
-    # Plot noisy images
+    # Handle single row case (axes is not an array)
+    if num_rows == 1:
+        axes = [axes]
+    
+    # If no denoiser names provided, use defaults
+    if denoiser_names is None:
+        denoiser_names = ['ideal', 'edm', 'grad-ascent'][:num_rows - 1]
+    
+    # Plot noisy images (first grid)
+    noisy_np = grids[0].permute(1, 2, 0).cpu().numpy()
     axes[0].imshow(noisy_np, aspect='auto')
     axes[0].set_title(
         "Noisy Images (x + σ·ε, where ε ~ N(0, I))",
@@ -130,32 +140,18 @@ def create_comparison_figure(
     )
     axes[0].axis('off')
     
-    # Plot ideal denoiser results
-    axes[1].imshow(ideal_np, aspect='auto')
-    axes[1].set_title(
-        "Ideal Denoiser Output D(x; σ) - Eq. 57 (Closed-form)",
-        fontsize=14,
-        pad=10
-    )
-    axes[1].axis('off')
-    
-    # Plot EDM denoiser results
-    axes[2].imshow(edm_np, aspect='auto')
-    axes[2].set_title(
-        "EDM Denoiser Output D(x; σ) - Pretrained Neural Network (One-step)",
-        fontsize=14,
-        pad=10
-    )
-    axes[2].axis('off')
-    
-    # Plot gradient ascent denoiser results
-    axes[3].imshow(grad_ascent_np, aspect='auto')
-    axes[3].set_title(
-        "Gradient Ascent Denoiser - Iterative Optimization (x ← x + lr·∇log p(x; σ))",
-        fontsize=14,
-        pad=10
-    )
-    axes[3].axis('off')
+    # Plot denoiser results (remaining grids)
+    for i, (grid, denoiser_name) in enumerate(zip(grids[1:], denoiser_names), start=1):
+        grid_np = grid.permute(1, 2, 0).cpu().numpy()
+        axes[i].imshow(grid_np, aspect='auto')
+        
+        # Get title from mapping or use default
+        title = denoiser_title_map.get(
+            denoiser_name,
+            f"{denoiser_name.capitalize()} Denoiser Output"
+        )
+        axes[i].set_title(title, fontsize=14, pad=10)
+        axes[i].axis('off')
     
     # Apply tight_layout first to get final axes positions
     plt.tight_layout(rect=[0, 0, 1, 0.97])

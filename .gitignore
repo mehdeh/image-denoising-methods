@@ -22,7 +22,7 @@ pretrain_models/
 # Results
 results/
 results_*/
-*.png
+#*.png
 *.jpg
 *.jpeg
 
